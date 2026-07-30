@@ -11,6 +11,12 @@ const fields = {
   floorOffset: document.querySelector("#floor-offset"),
   floorValue: document.querySelector("#floor-value"),
   alwaysOnTop: document.querySelector("#always-on-top"),
+  launchAtLogin: document.querySelector("#launch-at-login"),
+  autoUpdate: document.querySelector("#auto-update"),
+  updateStatus: document.querySelector("#update-status"),
+  checkUpdates: document.querySelector("#check-updates"),
+  installUpdate: document.querySelector("#install-update"),
+  version: document.querySelector("#version"),
   reset: document.querySelector("#reset"),
   close: document.querySelector("#close")
 };
@@ -22,6 +28,12 @@ function describeGap(seconds) {
   if (seconds < 60) return `${seconds}s`;
   const minutes = Math.round((seconds / 60) * 10) / 10;
   return `${minutes}min`;
+}
+
+function describeUpdateState(state) {
+  if (state === "current") return "Kairo is up to date.";
+  if (state === "checking") return "Looking for a new version...";
+  return "Updates are checked in the background.";
 }
 
 function render(settings) {
@@ -49,6 +61,18 @@ function render(settings) {
   fields.floorValue.textContent = isAuto ? "auto" : `${settings.floorOffset}px`;
 
   fields.alwaysOnTop.checked = settings.alwaysOnTop;
+  fields.launchAtLogin.checked = Boolean(settings.launchAtLogin);
+
+  fields.autoUpdate.checked = Boolean(settings.autoUpdate);
+  const update = settings.update ?? {};
+  fields.version.textContent = update.version ? `v${update.version}` : "";
+  fields.updateStatus.textContent = update.message || describeUpdateState(update.state);
+  fields.autoUpdate.disabled = update.state === "unsupported";
+  fields.checkUpdates.disabled =
+    update.state === "unsupported" ||
+    update.state === "checking" ||
+    update.state === "downloading";
+  fields.installUpdate.hidden = update.state !== "ready";
 
   applying = false;
 }
@@ -112,6 +136,21 @@ fields.floorOffset.addEventListener("input", () => {
 fields.alwaysOnTop.addEventListener("change", () => {
   save({ alwaysOnTop: fields.alwaysOnTop.checked });
 });
+
+fields.launchAtLogin.addEventListener("change", () => {
+  save({ launchAtLogin: fields.launchAtLogin.checked });
+});
+
+fields.autoUpdate.addEventListener("change", () => {
+  save({ autoUpdate: fields.autoUpdate.checked });
+});
+
+fields.checkUpdates.addEventListener("click", async () => {
+  fields.updateStatus.textContent = "Looking for a new version...";
+  await api.checkForUpdates();
+});
+
+fields.installUpdate.addEventListener("click", () => api.installUpdate());
 
 fields.reset.addEventListener("click", async () => {
   render(await api.reset());

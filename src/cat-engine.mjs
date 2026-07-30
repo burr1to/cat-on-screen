@@ -9,6 +9,7 @@ const DEFAULTS = Object.freeze({
   gravity: 1450,
   jumpSpeed: 570,
   throwScale: 1.15,
+  maxThrowSpeed: 1300,
   speechHoldMs: 3800
 });
 
@@ -175,8 +176,9 @@ export class CatEngine {
   dragTo(pointerX, pointerY, now) {
     if (!this.dragging) return;
     const elapsed = Math.max(8, now - this.lastPointer.now) / 1000;
-    this.vx = clamp((pointerX - this.lastPointer.x) / elapsed, -1300, 1300);
-    this.vy = clamp((pointerY - this.lastPointer.y) / elapsed, -1300, 1300);
+    const limit = this.options.maxThrowSpeed;
+    this.vx = clamp((pointerX - this.lastPointer.x) / elapsed, -limit, limit);
+    this.vy = clamp((pointerY - this.lastPointer.y) / elapsed, -limit, limit);
     this.x = clamp(pointerX - this.dragOffsetX, -this.options.catWidth * 0.35, this.maxX + this.options.catWidth * 0.35);
     this.y = clamp(pointerY - this.dragOffsetY, -this.options.catHeight * 0.35, this.groundY);
     this.direction = this.vx === 0 ? this.direction : Math.sign(this.vx);
@@ -218,6 +220,14 @@ export class CatEngine {
       this.vy += this.options.gravity * dt;
       this.x += this.vx * dt;
       this.y += this.vy * dt;
+
+      // There was no ceiling: a hard upward throw simply left the screen. Bounce
+      // him off the top instead, losing most of the energy so he drops back
+      // quickly.
+      if (this.y < 0) {
+        this.y = 0;
+        this.vy = Math.abs(this.vy) * 0.35;
+      }
 
       if (this.x < 0 || this.x > this.maxX) {
         this.x = clamp(this.x, 0, this.maxX);

@@ -2,10 +2,10 @@
 
 Kairo is an original grey pixel-art desktop pet. He walks, runs, sits, licks
 himself, grooms a paw, rolls onto his back, stretches, naps, jumps, reacts to
-clicks, and can be dragged and thrown. He wears a blue collar with a small bell that swings as he moves, and
-every so often he says something in a little speech bubble. He lives in a
-small transparent window that follows him around, so the rest of the desktop stays
-usable.
+clicks, and can be dragged and thrown. He wears a blue collar with a small bell
+that swings as he moves, and every so often he says something in a little speech
+bubble. He lives in a small transparent window that follows him around, so the
+rest of the desktop stays usable.
 
 ## Running it
 
@@ -49,6 +49,19 @@ mostly wanders and occasionally does something else:
 Dragging, throwing, falling, being petted and speaking are reactions rather than
 choices. He will not talk while asleep or on his back.
 
+Throw strength comes straight from the pointer velocity at release, capped by
+`maxThrowSpeed`. The stage also has a ceiling he bounces off, which is the one
+addition to the original physics: without it a hard upward throw carried him off
+the top of the screen, where Chromium throttled away the animation frames his
+physics run on and froze him mid-air -- see the note above about
+`backgroundThrottling`. Without either, a hard flick sent him several hundred pixels above the screen
+and took a couple of seconds to come back -- and if his window left the screen
+completely, Chromium throttled away the animation frames that his physics run on,
+freezing him mid-air where even "Call Kairo back" could not reach him. That is
+also why the cat window sets `backgroundThrottling: false`, why the main process
+refuses to place the window fully off-screen, and why "Call Kairo back" moves the
+window itself rather than only asking the renderer to.
+
 ## Settings
 
 Tray icon -> **Settings...** opens a small panel. Changes apply immediately and
@@ -61,11 +74,76 @@ are saved to `settings.json` in Electron's per-user data directory.
   like. Leave the box empty to get the defaults back.
 - **Position** -- lift him off the bottom edge if a taskbar or dock is covering
   his paws. Leave it on automatic unless it looks wrong.
+- **Updates** -- on by default. See below.
+- **Startup** -- open Kairo when you log in. Works on Windows and on Linux
+  desktops, including Pop!_OS.
 - **Always on top** -- same toggle as the tray.
 
 The phrase list is treated as untrusted input: blank lines are dropped, entries
 are trimmed and length-capped, and an empty list falls back to the defaults, so a
 hand-edited `settings.json` cannot break the app.
+
+### Opening at login
+
+Off by default -- Kairo never adds himself to startup uninvited. Turn it on from
+the settings panel or the tray.
+
+This is the operating system's setting, not one of ours, so it is **not** stored
+in `settings.json` and **not** touched by "Restore defaults". It is read back from
+the OS every time the panel opens, which means it stays correct even if you
+change it from your desktop's own startup-applications screen.
+
+- **Windows** -- a login item, via `app.setLoginItemSettings`.
+- **Linux** -- a `kairo.desktop` file in `~/.config/autostart` (or
+  `$XDG_CONFIG_HOME/autostart`), which Electron cannot do for you; see
+  `src/autostart.cjs`.
+
+The command registered is chosen carefully. A portable Windows build unpacks
+itself into `%TEMP%` and runs from there, so `process.execPath` points somewhere
+that will not exist at your next login -- the real file is
+`PORTABLE_EXECUTABLE_FILE`. An AppImage has the same problem and exposes
+`APPIMAGE`. Both are preferred over `execPath`, and `test/autostart.test.mjs`
+pins that behaviour.
+
+## Automatic updates
+
+Installed copies check GitHub Releases for a newer version, download it in the
+background, and apply it the next time Kairo quits -- nothing interrupts you
+mid-session. It is on by default and can be turned off under Updates in the
+settings panel, which also has a **Check now** button and shows the current
+version.
+
+Checks happen 12 seconds after launch and then every 6 hours.
+
+### Which builds can update themselves
+
+| Build | Updates | Why |
+| --- | --- | --- |
+| `Kairo-Setup-<version>-x64.exe` | yes | installed, so there is something to replace |
+| `Kairo-<version>-Linux-x86_64.AppImage` | yes | electron-updater replaces the AppImage in place |
+| `Kairo-<version>-Windows-x64-portable.exe` | **no** | see below |
+| running from source | no | update it with `git pull` |
+
+**The portable Windows build cannot update itself**, and this is not a bug that
+can be fixed: a portable exe unpacks a copy of itself into `%TEMP%` and runs from
+there, so there is no installed application to replace. Kairo detects that build
+and says so in the settings panel rather than failing quietly in the background.
+Hand people the **Setup** installer if you want them to receive updates; the
+portable exe is for quick throwaway testing, such as a VM.
+
+The Windows installer is one-click and per-user, so it needs no administrator
+rights and installs under `%LOCALAPPDATA%`.
+
+### What a release must contain
+
+`electron-builder` writes `latest.yml` (Windows) and `latest-linux.yml` (Linux)
+next to the binaries. Those files are how an installed copy discovers a new
+version, and `.blockmap` files let Windows download only the parts that changed.
+The release workflow uploads all of them. A release with binaries but no
+`latest*.yml` looks fine and updates nothing.
+
+Because the updater resolves releases from `build.publish` in `package.json`,
+that owner/repo must match wherever you actually publish.
 
 ## Artwork
 
@@ -134,6 +212,38 @@ To try the real transparent overlay on the current Linux desktop:
 ```bash
 npm start
 ```
+
+### Why dragging tracks at half speed
+
+Kairo's window follows him, so the coordinates a pointer event carries are
+measured against a frame of reference that moves with him: his own motion
+cancels part of the cursor's, and a drag tracks at roughly half speed.
+
+Scaling that measurement back up does not work, and this is worth stating
+plainly because it looks so obviously fixable. The measurement is a feedback
+loop, and it is only stable at a gain of 1. Simulating it:
+
+| gain | result |
+| --- | --- |
+| 1 | tracks at 0.50, stable |
+| 2 | diverges to 4.9e12 px |
+| 3 | 6.8e19 px |
+| 10 | 8.3e40 px |
+
+Several attempts at "reading the true cursor position" -- `event.screenX`,
+`event.movementX`, `clientX + window.screenX` -- were all gain above 1 wearing a
+different hat, and each one sent him shooting to the top of the screen. The
+window geometry is not at fault: requested, actual and renderer-side bounds all
+agree exactly, at every size.
+
+Full-speed dragging is possible, but only with a window that does not move
+during the drag, which means growing it to cover the drag area on mouse-down.
+That works and was built, but resizing a transparent window makes the compositor
+flash, and it must resize on every grab. Half speed with a window that never
+resizes was the better trade.
+
+`npm run test:drag` asserts the property that actually matters: he never outruns
+the cursor. The exact ratio depends on event timing, so it is not asserted.
 
 ### How clicks reach the desktop
 
@@ -207,7 +317,42 @@ npm start -- --floor=64
 
 Use `--floor=0` to stand on the very bottom edge of the screen.
 
-## Build packages
+## Releasing
+
+Releases are built by GitHub Actions, not from a local `release/` folder -- that
+directory is gitignored, so what ships is always built from what is committed.
+
+Cut a release by tagging. `npm version` writes the new number into
+`package.json`, commits it and creates the tag in one step:
+
+```bash
+npm version patch     # 0.1.0 -> 0.1.1   (fixes)
+npm version minor     # 0.1.0 -> 0.2.0   (new behaviour)
+git push --follow-tags
+```
+
+Pushing the tag triggers `.github/workflows/release.yml`, which:
+
+1. builds on `windows-latest` and `ubuntu-latest` in parallel -- the Windows
+   build is native, so it needs no Wine,
+2. runs the behaviour tests first, so a failing tag cannot ship,
+3. creates the GitHub release with generated notes and attaches
+   `Kairo-<version>-Windows-x64.exe` and `Kairo-<version>-Linux-x86_64.AppImage`.
+
+The version in the tag and the version in `package.json` are the same number
+because `npm version` sets both, and electron-builder names the artifacts from
+`package.json`. Tagging by hand instead will produce a release whose name and
+binaries disagree.
+
+If a build fails, fix it and re-run without touching the tag: **Actions ->
+Release -> Run workflow**, and give it the existing tag. Binaries are replaced
+rather than duplicated.
+
+`.github/workflows/ci.yml` runs the tests, the overlay smoke test and the drag
+test on every push to `main`, which is the cheap way to find out a release would
+have failed before you tag it.
+
+### Building locally instead
 
 Build a Linux AppImage:
 
@@ -220,6 +365,12 @@ Build a portable Windows x64 `.exe` from Linux:
 ```bash
 ./scripts/build-windows-docker.sh
 ```
+
+This produces **both** Windows targets: the NSIS installer (which auto-updates)
+and the portable exe (which cannot). `dist:windows` deliberately passes no target
+on the command line -- `--win portable` would override `build.win.target` and
+silently skip the installer, which is how the only auto-updating Windows build
+went missing once.
 
 Build directly on Windows with Node.js installed:
 

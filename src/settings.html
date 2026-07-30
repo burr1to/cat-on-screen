@@ -11,7 +11,7 @@
   </head>
   <body>
     <header class="head">
-      <h1>Kairo</h1>
+      <h1>Kairo <span id="version" class="version"></span></h1>
       <p class="hint">Changes apply straight away.</p>
     </header>
 
@@ -57,6 +57,33 @@
         <input id="floor-offset" type="range" min="0" max="400" step="4" />
         <p class="hint">
           Raise this if he stands behind a taskbar or dock.
+        </p>
+      </section>
+
+      <section class="group">
+        <h2>Updates</h2>
+        <label class="check">
+          <input id="auto-update" type="checkbox" />
+          <span>Keep Kairo up to date automatically</span>
+        </label>
+        <p class="hint" id="update-status">Checking...</p>
+        <div class="actions">
+          <button id="check-updates" type="button">Check now</button>
+          <button id="install-update" type="button" class="primary" hidden>
+            Restart to update
+          </button>
+        </div>
+      </section>
+
+      <section class="group">
+        <h2>Startup</h2>
+        <label class="check">
+          <input id="launch-at-login" type="checkbox" />
+          <span>Open Kairo when I log in</span>
+        </label>
+        <p class="hint" id="launch-hint">
+          Handled by your system's startup settings, not saved with the options
+          above.
         </p>
       </section>
 

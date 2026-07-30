@@ -42,3 +42,11 @@ test("phrase count and length are bounded", () => {
   const long = normalise({ phrases: ["x".repeat(400)] }).phrases[0];
   assert.equal(long.length, LIMITS.phrases.length);
 });
+
+test("automatic updates are on by default and can be turned off", () => {
+  assert.equal(DEFAULTS.autoUpdate, true);
+  assert.equal(normalise({}).autoUpdate, true);
+  assert.equal(normalise({ autoUpdate: false }).autoUpdate, false);
+  // Junk should not silently disable updates.
+  assert.equal(normalise({ autoUpdate: "no" }).autoUpdate, true);
+});

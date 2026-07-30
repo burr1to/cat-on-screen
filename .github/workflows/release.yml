@@ -1,0 +1,102 @@
+name: Release
+
+# Pushing a version tag builds Kairo for both platforms and publishes a GitHub
+# release with the binaries attached. Nothing is released without a tag, so
+# ordinary pushes to main stay harmless.
+on:
+  push:
+    tags:
+      - "v*"
+  # Lets you rebuild and re-attach binaries for a tag that already exists,
+  # without having to delete and re-push the tag.
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing tag to build and publish (e.g. v0.1.0)"
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build ${{ matrix.label }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      # One platform failing should not hide whether the other one built.
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            label: Windows x64
+            script: "dist:windows"
+          - os: ubuntu-latest
+            label: Linux x86_64
+            script: "dist:linux"
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      # A tag should not be able to ship a build whose behaviour tests fail.
+      - name: Behaviour tests
+        run: npm test
+
+      # --publish never matters: electron-builder infers a GitHub publish target
+      # from the git remote and would try to create its own release, colliding
+      # with the publish job below. Building and publishing stay separate.
+      - name: Build
+        run: npm run ${{ matrix.script }} -- --publish never
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: kairo-${{ matrix.os }}
+          # latest*.yml is what installed copies poll to discover a new version,
+          # and the blockmaps let Windows download only the changed parts. Ship
+          # the binaries without these and auto-update silently never fires.
+          # Narrower than *.yml on purpose: builder-debug.yml is not for users.
+          path: |
+            release/*.exe
+            release/*.AppImage
+            release/latest*.yml
+            release/*.blockmap
+          if-no-files-found: error
+          retention-days: 7
+
+  publish:
+    name: Publish release
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Attach binaries to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ github.event.inputs.tag || github.ref_name }}
+        run: |
+          set -euo pipefail
+          ls -lh dist
+
+          # Re-running for an existing tag should replace the binaries rather
+          # than fail, so a failed build can simply be retried.
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" dist/* --clobber
+          else
+            gh release create "$TAG" dist/* \
+              --title "Kairo $TAG" \
+              --generate-notes
+          fi

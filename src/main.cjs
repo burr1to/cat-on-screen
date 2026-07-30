@@ -3,6 +3,8 @@ const fs = require("node:fs");
 const path = require("node:path");
 
 const { createStore, LIMITS } = require("./settings.cjs");
+const autostart = require("./autostart.cjs");
+const { createUpdater } = require("./updater.cjs");
 
 const captureArgument = process.argv.find((argument) => argument.startsWith("--capture="));
 const capturePath = captureArgument?.slice("--capture=".length);
@@ -36,8 +38,23 @@ if (
   !process.argv.includes("--wayland") &&
   !process.argv.some((argument) => argument.startsWith("--ozone-platform="))
 ) {
-  app.relaunch({ args: process.argv.slice(1).concat("--ozone-platform=x11") });
-  app.exit(0);
+  // Spawned by hand rather than with app.relaunch(). An AppImage runs from a
+  // temporary mount that is torn down when this process exits, and relaunching
+  // through Electron left the replacement dying silently with no window. A
+  // detached child starts immediately, before any of that teardown, and the
+  // AppImage file itself is a stable thing to launch.
+  const command = process.env.APPIMAGE || process.execPath;
+  const args = process.argv.slice(1).concat("--ozone-platform=x11");
+
+  try {
+    require("node:child_process")
+      .spawn(command, args, { detached: true, stdio: "ignore" })
+      .unref();
+    app.exit(0);
+  } catch (error) {
+    // Better to run without XWayland than not to run at all.
+    console.warn(`Could not restart under XWayland: ${error.message}`);
+  }
 }
 
 // Mirrors the sprite grid in cat-sprite.mjs, which this file cannot import
@@ -53,6 +70,10 @@ const CAT_START_FRACTION = 0.16;
 // A little wider than the cat at small scales, so a speech bubble still has room
 // to be readable -- the bubble lives in this window and is clipped by it.
 const MIN_WINDOW_WIDTH = 210;
+
+function clampRange(value, minimum, maximum) {
+  return Math.min(maximum, Math.max(minimum, value));
+}
 
 function windowSizeFor(scale) {
   return {
@@ -104,6 +125,7 @@ function floorInsetFor(display) {
 let catWindow = null;
 let settingsWindow = null;
 let stageOrigin = { x: 0, y: 0 };
+let updater = null;
 let tray = null;
 let store = null;
 let isPaused = false;
@@ -149,7 +171,6 @@ function createCatWindow() {
     // clickable at all.
     focusable: isCaptureMode,
     resizable: false,
-    movable: false,
     minimizable: false,
     maximizable: false,
     fullscreenable: false,
@@ -159,7 +180,13 @@ function createCatWindow() {
       preload: path.join(__dirname, "preload.cjs"),
       contextIsolation: true,
       nodeIntegration: false,
-      sandbox: true
+      sandbox: true,
+      // Kairo's physics run on requestAnimationFrame, and Chromium throttles
+      // that to a crawl for windows it believes are hidden or off-screen. A hard
+      // throw once carried him off the top of the screen, the loop stopped, and
+      // he froze mid-air permanently -- "Call Kairo back" could not rescue him
+      // because applying the new position needs a frame that never arrived.
+      backgroundThrottling: false
     }
   });
 
@@ -231,13 +258,51 @@ function sendCommand(command, payload = {}) {
   catWindow?.webContents.send("cat:command", { command, ...payload });
 }
 
+function launchTargetForThisApp() {
+  return autostart.launchTarget({
+    execPath: process.execPath,
+    appPath: app.getAppPath(),
+    isPackaged: app.isPackaged
+  });
+}
+
+function launchesAtLogin() {
+  if (process.platform === "linux") return autostart.isEnabledLinux();
+
+  try {
+    return app.getLoginItemSettings().openAtLogin;
+  } catch {
+    return false;
+  }
+}
+
+function setLaunchesAtLogin(enabled) {
+  const target = launchTargetForThisApp();
+
+  if (process.platform === "linux") {
+    autostart.setEnabledLinux(enabled, target);
+    return;
+  }
+
+  try {
+    app.setLoginItemSettings({ openAtLogin: enabled, path: target.path, args: target.args });
+  } catch (error) {
+    console.warn(`Could not change the login item: ${error.message}`);
+  }
+}
+
 function publishSettings() {
-  const settings = store.get();
+  const settings = {
+    ...store.get(),
+    launchAtLogin: launchesAtLogin(),
+    update: updater?.status ?? { state: "idle", message: "", version: app.getVersion() }
+  };
   catWindow?.webContents.send("cat:settings", settings);
   settingsWindow?.webContents.send("cat:settings", settings);
 
   isAlwaysOnTop = settings.alwaysOnTop;
   catWindow?.setAlwaysOnTop(isAlwaysOnTop, "floating");
+  updater?.setEnabled(settings.autoUpdate);
   publishStage();
   updateTrayMenu();
 }
@@ -256,10 +321,27 @@ function publishStage() {
     catWindow.setBounds({ ...bounds, width: stage.window.width, height: stage.window.height });
   }
 
+  // `full` must be sent explicitly, not left out: the renderer merges stage
+  // updates, so an omitted flag would leave a previous `full: true` in place and
+  // the window would stay stage-sized and stop following him.
   catWindow.webContents.send("cat:stage", {
     world: stage.world,
     window: stage.window,
     origin: stage.origin
+  });
+}
+
+// Drops the window back in the middle of the screen from the main process, so it
+// works even if the renderer is not currently painting.
+function recentreWindow() {
+  if (!catWindow || isCaptureMode) return;
+
+  const stage = stageFor();
+  catWindow.setBounds({
+    x: stage.origin.x + Math.round((stage.world.width - stage.window.width) / 2),
+    y: stage.origin.y + stage.world.height - stage.window.height,
+    width: stage.window.width,
+    height: stage.window.height
   });
 }
 
@@ -297,6 +379,30 @@ function openSettingsWindow() {
   });
 }
 
+// Only shows an update entry when there is something to say about it.
+function updateMenuItems() {
+  const state = updater?.status?.state;
+
+  if (state === "ready") {
+    return [
+      {
+        label: "Restart to finish updating",
+        click: () => updater?.installNow()
+      }
+    ];
+  }
+
+  if (!updater?.supported) return [];
+
+  return [
+    {
+      label: state === "checking" || state === "downloading" ? "Updating..." : "Check for updates",
+      enabled: state !== "checking" && state !== "downloading",
+      click: () => updater?.checkNow()
+    }
+  ];
+}
+
 function updateTrayMenu() {
   if (!tray) return;
 
@@ -313,7 +419,10 @@ function updateTrayMenu() {
     },
     {
       label: "Call Kairo back",
-      click: () => sendCommand("reset")
+      click: () => {
+        recentreWindow();
+        sendCommand("reset");
+      }
     },
     {
       label: "Make Kairo jump",
@@ -324,6 +433,7 @@ function updateTrayMenu() {
       label: "Settings...",
       click: () => openSettingsWindow()
     },
+    ...updateMenuItems(),
     {
       label: "Always on top",
       type: "checkbox",
@@ -335,19 +445,15 @@ function updateTrayMenu() {
         updateTrayMenu();
       }
     },
-    ...(process.platform === "win32"
-      ? [
-          {
-            label: "Start with Windows",
-            type: "checkbox",
-            checked: app.getLoginItemSettings().openAtLogin,
-            click: (menuItem) => {
-              app.setLoginItemSettings({ openAtLogin: menuItem.checked });
-              updateTrayMenu();
-            }
-          }
-        ]
-      : []),
+    {
+      label: "Start when I log in",
+      type: "checkbox",
+      checked: launchesAtLogin(),
+      click: (menuItem) => {
+        setLaunchesAtLogin(menuItem.checked);
+        publishSettings();
+      }
+    },
     { type: "separator" },
     {
       label: "Quit",
@@ -371,7 +477,10 @@ function createTray() {
 
   tray = new Tray(trayIcon.resize({ width: 20, height: 20 }));
   tray.setToolTip("Kairo");
-  tray.on("click", () => sendCommand("reset"));
+  tray.on("click", () => {
+    recentreWindow();
+    sendCommand("reset");
+  });
   updateTrayMenu();
 }
 
@@ -383,9 +492,23 @@ ipcMain.on("cat:frame", (event, frame) => {
   if (BrowserWindow.fromWebContents(event.sender) !== catWindow || isCaptureMode) return;
   if (!frame || !Number.isFinite(frame.x) || !Number.isFinite(frame.y)) return;
 
-  const x = stageOrigin.x + Math.round(frame.x);
-  const y = stageOrigin.y + Math.round(frame.y);
   const bounds = catWindow.getBounds();
+  const area = screen.getPrimaryDisplay().workArea;
+
+  // Belt and braces for the freeze described above: whatever the engine asks
+  // for, keep a strip of the window on screen so it can never become invisible
+  // and get its animation frames throttled away.
+  const margin = 60;
+  const x = clampRange(
+    stageOrigin.x + Math.round(frame.x),
+    area.x - bounds.width + margin,
+    area.x + area.width - margin
+  );
+  const y = clampRange(
+    stageOrigin.y + Math.round(frame.y),
+    area.y - bounds.height + margin,
+    area.y + area.height - margin
+  );
 
   if (bounds.x !== x || bounds.y !== y) {
     catWindow.setBounds({ x, y, width: bounds.width, height: bounds.height });
@@ -398,19 +521,38 @@ ipcMain.on("cat:settings-request", (event) => {
   publishStage();
 });
 
-ipcMain.handle("settings:read", () => store.get());
+function settingsPayload() {
+  return {
+    ...store.get(),
+    launchAtLogin: launchesAtLogin(),
+    update: updater?.status ?? { state: "idle", message: "", version: app.getVersion() }
+  };
+}
+
+ipcMain.handle("settings:read", () => settingsPayload());
+ipcMain.handle("update:check", () => updater?.checkNow() ?? false);
+ipcMain.handle("update:install", () => updater?.installNow() ?? false);
 ipcMain.handle("settings:limits", () => LIMITS);
 
 ipcMain.handle("settings:write", (_event, patch) => {
-  const settings = store.update(patch ?? {});
+  const incoming = patch ?? {};
+
+  // Not a stored setting -- it is applied to the OS and read back from it.
+  if (typeof incoming.launchAtLogin === "boolean") {
+    setLaunchesAtLogin(incoming.launchAtLogin);
+  }
+
+  store.update(incoming);
   publishSettings();
-  return settings;
+  return settingsPayload();
 });
 
 ipcMain.handle("settings:reset", () => {
-  const settings = store.reset();
+  store.reset();
   publishSettings();
-  return settings;
+  // Restoring defaults deliberately leaves the login item alone: it is a system
+  // preference, not part of Kairo's appearance.
+  return settingsPayload();
 });
 
 ipcMain.on("settings:close", (event) => {
@@ -430,6 +572,14 @@ if (!hasSingleInstanceLock) {
     screen.on("display-removed", () => publishStage());
     store = createStore(app.getPath("userData"));
     isAlwaysOnTop = store.get().alwaysOnTop;
+    updater = createUpdater({
+      app,
+      onStatus: () => {
+        // Keep the tray label and any open settings panel in step.
+        updateTrayMenu();
+        settingsWindow?.webContents.send("cat:settings", settingsPayload());
+      }
+    });
     createCatWindow();
     if (!isAutomatedTest) createTray();
   });

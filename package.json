@@ -13,7 +13,7 @@
     "test:visual": "xvfb-run -a electron . --capture=artifacts/linux-sandbox.png",
     "pack:linux": "electron-builder --linux dir",
     "dist:linux": "electron-builder --linux AppImage",
-    "dist:windows": "electron-builder --win portable --x64",
+    "dist:windows": "electron-builder --win --x64",
     "test:drag": "xvfb-run -a electron scripts/verify-drag.cjs"
   },
   "keywords": [
@@ -42,9 +42,10 @@
     },
     "win": {
       "target": [
+        "nsis",
         "portable"
       ],
-      "artifactName": "Kairo-${version}-Windows-${arch}.${ext}"
+      "artifactName": "Kairo-${version}-Windows-${arch}-portable.${ext}"
     },
     "linux": {
       "target": [
@@ -52,7 +53,27 @@
       ],
       "category": "Utility",
       "syncDesktopName": true,
-      "artifactName": "Kairo-${version}-Linux-${arch}.${ext}"
-    }
+      "artifactName": "Kairo-${version}-Linux-${arch}.${ext}",
+      "executableArgs": [
+        "--ozone-platform=x11"
+      ]
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": false,
+      "artifactName": "Kairo-Setup-${version}-${arch}.${ext}",
+      "shortcutName": "Kairo"
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "burr1to",
+        "repo": "cat-on-screen"
+      }
+    ]
+  },
+  "dependencies": {
+    "electron-updater": "^6.8.9"
   }
 }

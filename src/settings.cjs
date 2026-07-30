@@ -29,7 +29,8 @@ const DEFAULTS = Object.freeze({
   phrases: DEFAULT_PHRASES,
   // null means "work it out from the display", which is right almost everywhere.
   floorOffset: null,
-  alwaysOnTop: true
+  alwaysOnTop: true,
+  autoUpdate: true
 });
 
 const LIMITS = Object.freeze({
@@ -75,7 +76,9 @@ function normalise(raw) {
         ? null
         : clampNumber(input.floorOffset, LIMITS.floorOffset, 0),
     alwaysOnTop:
-      typeof input.alwaysOnTop === "boolean" ? input.alwaysOnTop : DEFAULTS.alwaysOnTop
+      typeof input.alwaysOnTop === "boolean" ? input.alwaysOnTop : DEFAULTS.alwaysOnTop,
+    autoUpdate:
+      typeof input.autoUpdate === "boolean" ? input.autoUpdate : DEFAULTS.autoUpdate
   };
 }
 

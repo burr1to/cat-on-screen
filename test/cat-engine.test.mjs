@@ -157,3 +157,51 @@ test("petting gets a reply", () => {
   assert.equal(engine.speech.text, "I love you");
   assert.equal(engine.state, "happy");
 });
+
+test("even the hardest possible throw keeps him on screen and lands quickly", () => {
+  const width = 1920;
+  const height = 1040;
+  const engine = new CatEngine({ width, height, random: () => 0.5 });
+
+  // Flick far faster than any real mouse gesture, upwards and sideways.
+  engine.beginDrag(engine.x + 40, engine.y + 40, 0);
+  engine.dragTo(engine.x + 40 + 4000, engine.y + 40 - 4000, 16);
+  engine.endDrag(20);
+
+  let airborneMs = 0;
+  for (let frame = 0; frame < 600 && !engine.onGround; frame += 1) {
+    engine.step(1 / 60, 20 + frame * (1000 / 60));
+    airborneMs = frame * (1000 / 60);
+
+    assert.ok(engine.y >= 0, `left the top of the screen (y=${engine.y})`);
+    assert.ok(engine.y <= engine.groundY, `fell through the floor (y=${engine.y})`);
+    assert.ok(engine.x >= 0 && engine.x <= engine.maxX, `left the side (x=${engine.x})`);
+  }
+
+  assert.equal(engine.onGround, true, "never landed");
+  assert.ok(airborneMs < 2500, `took ${Math.round(airborneMs)}ms to settle`);
+});
+
+
+test("pausing mid-drag before letting go drops him instead of throwing him", () => {
+  const engine = new CatEngine({ width: 1920, height: 1040, random: () => 0.5 });
+  let time = 0;
+
+  engine.beginDrag(600, 500, time);
+  for (let step = 0; step < 5; step += 1) {
+    time += 16;
+    engine.dragTo(600 + step * 50, 500 - step * 40, time);
+  }
+
+  // Held still for longer than the sampling window.
+  for (let step = 0; step < 8; step += 1) {
+    time += 30;
+    engine.dragTo(850, 340, time);
+  }
+
+  engine.endDrag(time);
+  assert.ok(
+    Math.hypot(engine.vx, engine.vy) < 60,
+    `still had ${Math.hypot(engine.vx, engine.vy).toFixed(0)}px/s after holding still`
+  );
+});

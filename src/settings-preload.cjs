@@ -6,6 +6,8 @@ contextBridge.exposeInMainWorld("kairoSettings", {
   reset: () => ipcRenderer.invoke("settings:reset"),
   limits: () => ipcRenderer.invoke("settings:limits"),
   close: () => ipcRenderer.send("settings:close"),
+  checkForUpdates: () => ipcRenderer.invoke("update:check"),
+  installUpdate: () => ipcRenderer.invoke("update:install"),
   // Keeps the panel honest if something else changes a setting, e.g. the tray
   // toggling "always on top" while this window is open.
   onChanged(callback) {

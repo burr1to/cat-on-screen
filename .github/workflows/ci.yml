@@ -1,0 +1,36 @@
+name: Tests
+
+# Runs on ordinary pushes so breakage is caught before you tag a release,
+# rather than by the release build failing halfway through.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: Behaviour tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - run: npm test
+
+      # These drive a real Electron window, so they need a virtual display.
+      - name: Install a virtual display
+        run: sudo apt-get update && sudo apt-get install -y xvfb
+
+      - name: Overlay smoke test
+        run: npm run test:overlay
+
+      - name: Drag tracks the pointer one-to-one
+        run: npm run test:drag

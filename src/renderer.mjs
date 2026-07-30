@@ -69,14 +69,40 @@ function pageWidth() {
   return isPreview ? window.innerWidth : stage.window.width;
 }
 
-// Drag coordinates must be in stage space, not window space. The window follows
-// Kairo, so a window-relative pointer position moves with him and only drags him
-// at roughly half speed -- he could never reach the far side of the screen.
-// Screen coordinates are independent of where his window happens to be.
-function stagePointer(event) {
-  if (isPreview) return { x: event.clientX, y: event.clientY };
-  return { x: event.screenX - stage.origin.x, y: event.screenY - stage.origin.y };
-}
+// Must be 1. Kairo's window follows him, so clientX is measured against a frame
+// of reference that moves with him: his own motion cancels exactly half of the
+// cursor's, and a drag tracks at half speed. It is tempting to scale that back
+// up, but the measurement loop is only stable at a gain of 1 -- simulating the
+// loop at 2 sends him to 4.9e12 px, and at 10 to 8.3e40. Every previous attempt
+// to recover full speed was some form of gain > 1, which is why he shot to the
+// top of the screen.
+//
+// Half speed is the price of a window that never resizes, and therefore never
+// flickers or throws him across the screen. Full speed needs a stationary
+// window covering the drag area; see the README.
+const DRAG_GAIN = 1;
+
+// Dragging cannot trust any global pointer coordinate here.
+//
+// Kairo's window is moved every frame to follow him, and Wayland does not tell a
+// client where the cursor is on screen -- under XWayland those coordinates can
+// come back window-relative. Both ways of using them failed in practice:
+// absolute screenX fed his own position back into itself and he accelerated away
+// from the cursor, and movementX (which Chromium derives from the same numbers)
+// went to nearly zero while the window chased the pointer, so he would not drag
+// at all.
+//
+// Dragging reads clientX/clientY directly. Those are window-relative, and the
+// window follows Kairo, so his own motion cancels part of the cursor's: the
+// measured movement comes out smaller than the real one. DRAG_GAIN scales it
+// back up. The loop is stable -- it converges on a fixed ratio rather than
+// running away -- so this trades a little precision for a window that never
+// resizes, and therefore never flickers or jumps him across the screen.
+let dragPointer = null;
+
+// Where the press landed, in both stage and window coordinates. A drag is
+// measured as a displacement from here.
+let dragGrab = null;
 
 function applyScale(nextScale) {
   scale = nextScale;
@@ -148,13 +174,8 @@ function updateView(now) {
   updateBubble();
 
   if (!isPreview) {
-    // The cat's stage position becomes the window's position; his offset inside
-    // the window is constant.
     const origin = catOrigin();
-    window.desktopPet?.placeWindow({
-      x: engine.x - origin.x,
-      y: engine.y - origin.y
-    });
+    window.desktopPet?.placeWindow({ x: engine.x - origin.x, y: engine.y - origin.y });
   }
 
   layOutCat();
@@ -176,8 +197,19 @@ function hitsCat(event) {
 
 catElement.addEventListener("pointerdown", (event) => {
   if (!hitsCat(event)) return;
-  const point = stagePointer(event);
+
+  // Anchor the virtual pointer to where inside him the press landed. This is the
+  // only measurement taken, and it is element-relative, so it cannot be thrown
+  // off by where the window happens to be.
+  const bounds = catElement.getBoundingClientRect();
+  const point = {
+    x: engine.x + (event.clientX - bounds.left),
+    y: engine.y + (event.clientY - bounds.top)
+  };
+
   if (!engine.beginDrag(point.x, point.y, performance.now())) return;
+  dragPointer = { ...point };
+  dragGrab = { stage: { ...point }, client: { x: event.clientX, y: event.clientY } };
   pointerStart = {
     x: point.x,
     y: point.y,
@@ -188,15 +220,19 @@ catElement.addEventListener("pointerdown", (event) => {
 });
 
 catElement.addEventListener("pointermove", (event) => {
-  if (!engine.dragging) return;
-  const point = stagePointer(event);
-  engine.dragTo(point.x, point.y, performance.now());
+  if (!engine.dragging || !dragGrab) return;
+
+  dragPointer = {
+    x: dragGrab.stage.x + (event.clientX - dragGrab.client.x) * DRAG_GAIN,
+    y: dragGrab.stage.y + (event.clientY - dragGrab.client.y) * DRAG_GAIN
+  };
+  engine.dragTo(dragPointer.x, dragPointer.y, performance.now());
 });
 
 function finishPointer(event) {
   if (!engine.dragging || !pointerStart) return;
 
-  const point = stagePointer(event);
+  const point = dragPointer ?? pointerStart;
   const distance = Math.hypot(point.x - pointerStart.x, point.y - pointerStart.y);
   const duration = performance.now() - pointerStart.time;
   const wasTap = distance < 7 && duration < 360;
@@ -204,6 +240,8 @@ function finishPointer(event) {
   engine.endDrag(performance.now(), { toss: !wasTap });
   if (wasTap) engine.pet(performance.now());
   pointerStart = null;
+  dragPointer = null;
+  dragGrab = null;
 }
 
 catElement.addEventListener("pointerup", finishPointer);
@@ -215,6 +253,8 @@ catElement.addEventListener("keydown", (event) => {
     event.preventDefault();
   }
 });
+
+window.addEventListener("resize", layOutCat);
 
 window.desktopPet?.onStage((next) => {
   if (!next) return;

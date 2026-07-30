@@ -141,6 +141,27 @@ input[type="range"]:focus-visible {
   outline-offset: 2px;
 }
 
+.version {
+  color: var(--ink-soft);
+  font-size: 11.5px;
+  font-weight: 500;
+}
+
+.actions {
+  display: flex;
+  gap: 8px;
+  padding-top: 4px;
+}
+
+.actions button {
+  padding: 5px 11px;
+  font-size: 12px;
+}
+
+.actions button[hidden] {
+  display: none;
+}
+
 .foot {
   display: flex;
   flex: none;
