@@ -29,8 +29,17 @@ jobs:
       - name: Install a virtual display
         run: sudo apt-get update && sudo apt-get install -y xvfb
 
+      # Electron's SUID sandbox helper ships without the ownership it needs, and
+      # Electron refuses to run unsandboxed rather than quietly weakening itself.
+      # Fixing the permissions keeps the tests running the same sandbox setting
+      # the app actually ships with, which disabling the sandbox would not.
+      - name: Let Electron's sandbox run on the runner
+        run: |
+          sudo chown root:root node_modules/electron/dist/chrome-sandbox
+          sudo chmod 4755 node_modules/electron/dist/chrome-sandbox
+
       - name: Overlay smoke test
         run: npm run test:overlay
 
-      - name: Drag tracks the pointer one-to-one
+      - name: Drag tracks the cursor without running away
         run: npm run test:drag

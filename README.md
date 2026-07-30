@@ -350,7 +350,11 @@ rather than duplicated.
 
 `.github/workflows/ci.yml` runs the tests, the overlay smoke test and the drag
 test on every push to `main`, which is the cheap way to find out a release would
-have failed before you tag it.
+have failed before you tag it. It fixes the ownership of Electron's SUID sandbox
+helper first: runners ship it unowned by root, and Electron aborts rather than
+run unsandboxed.
+
+Note that pushing commits does **not** produce a release. Only a `v*` tag does.
 
 ### Building locally instead
 
