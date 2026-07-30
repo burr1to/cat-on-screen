@@ -1,6 +1,6 @@
 {
   "name": "kairo-desktop-cat",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "A tiny grey cartoon cat that lives on your desktop.",
   "desktopName": "kairo-desktop-cat.desktop",
   "main": "src/main.cjs",
