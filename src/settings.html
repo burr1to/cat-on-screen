@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; object-src 'none'"
+    />
+    <title>Kairo settings</title>
+    <link rel="stylesheet" href="./settings.css" />
+  </head>
+  <body>
+    <header class="head">
+      <h1>Kairo</h1>
+      <p class="hint">Changes apply straight away.</p>
+    </header>
+
+    <main>
+      <section class="group">
+        <h2>Size</h2>
+        <div class="row">
+          <label for="scale">How big is he</label>
+          <output id="scale-value" for="scale">5&times;</output>
+        </div>
+        <input id="scale" type="range" min="3" max="8" step="1" />
+      </section>
+
+      <section class="group">
+        <h2>Talking</h2>
+        <label class="check">
+          <input id="speech-enabled" type="checkbox" />
+          <span>Let Kairo say things</span>
+        </label>
+
+        <div class="row">
+          <label for="speech-gap">Roughly every</label>
+          <output id="speech-gap-value" for="speech-gap">75s</output>
+        </div>
+        <input id="speech-gap" type="range" min="10" max="600" step="5" />
+
+        <label class="stack" for="phrases">
+          <span>Things he can say &mdash; one per line</span>
+          <textarea id="phrases" rows="9" spellcheck="false"></textarea>
+        </label>
+      </section>
+
+      <section class="group">
+        <h2>Position</h2>
+        <label class="check">
+          <input id="floor-auto" type="checkbox" />
+          <span>Work out the floor automatically</span>
+        </label>
+        <div class="row">
+          <label for="floor-offset">Lift him off the bottom by</label>
+          <output id="floor-value" for="floor-offset">0px</output>
+        </div>
+        <input id="floor-offset" type="range" min="0" max="400" step="4" />
+        <p class="hint">
+          Raise this if he stands behind a taskbar or dock.
+        </p>
+      </section>
+
+      <section class="group">
+        <label class="check">
+          <input id="always-on-top" type="checkbox" />
+          <span>Keep him above other windows</span>
+        </label>
+      </section>
+    </main>
+
+    <footer class="foot">
+      <button id="reset" class="ghost" type="button">Restore defaults</button>
+      <button id="close" class="primary" type="button">Close</button>
+    </footer>
+
+    <script type="module" src="./settings.mjs"></script>
+  </body>
+</html>

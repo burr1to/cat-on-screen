@@ -1,0 +1,58 @@
+{
+  "name": "kairo-desktop-cat",
+  "version": "0.1.0",
+  "description": "A tiny grey cartoon cat that lives on your desktop.",
+  "desktopName": "kairo-desktop-cat.desktop",
+  "main": "src/main.cjs",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron . --debug",
+    "assets:icon": "xvfb-run -a electron scripts/export-icon.cjs",
+    "test": "node --test",
+    "test:overlay": "xvfb-run -a electron . --smoke-test",
+    "test:visual": "xvfb-run -a electron . --capture=artifacts/linux-sandbox.png",
+    "pack:linux": "electron-builder --linux dir",
+    "dist:linux": "electron-builder --linux AppImage",
+    "dist:windows": "electron-builder --win portable --x64",
+    "test:drag": "xvfb-run -a electron scripts/verify-drag.cjs"
+  },
+  "keywords": [
+    "desktop-pet",
+    "cat",
+    "electron"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "43.2.0",
+    "electron-builder": "26.15.3"
+  },
+  "build": {
+    "appId": "com.kairocat.desktop",
+    "productName": "Kairo",
+    "asar": true,
+    "icon": "assets/app-icon.png",
+    "files": [
+      "src/**/*",
+      "assets/**/*",
+      "package.json"
+    ],
+    "directories": {
+      "output": "release"
+    },
+    "win": {
+      "target": [
+        "portable"
+      ],
+      "artifactName": "Kairo-${version}-Windows-${arch}.${ext}"
+    },
+    "linux": {
+      "target": [
+        "AppImage"
+      ],
+      "category": "Utility",
+      "syncDesktopName": true,
+      "artifactName": "Kairo-${version}-Linux-${arch}.${ext}"
+    }
+  }
+}

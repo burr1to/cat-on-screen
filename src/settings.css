@@ -1,0 +1,196 @@
+:root {
+  --ink: #23252a;
+  --ink-soft: #6f7276;
+  --line: #d7dade;
+  --panel: #ffffff;
+  --page: #f1f3f5;
+  --accent: #6f7276;
+
+  color-scheme: light dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+}
+
+body {
+  display: flex;
+  flex-direction: column;
+  background: var(--page);
+  color: var(--ink);
+  font-family: Inter, "Segoe UI", system-ui, sans-serif;
+  font-size: 13px;
+}
+
+.head {
+  flex: none;
+  padding: 14px 16px 10px;
+  border-bottom: 1px solid var(--line);
+  background: var(--panel);
+}
+
+.head h1 {
+  margin: 0;
+  font-size: 15px;
+  letter-spacing: 0.01em;
+}
+
+.hint {
+  margin: 3px 0 0;
+  color: var(--ink-soft);
+  font-size: 11.5px;
+}
+
+main {
+  flex: 1;
+  overflow-y: auto;
+  padding: 4px 16px 12px;
+}
+
+.group {
+  padding: 12px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.group:last-child {
+  border-bottom: 0;
+}
+
+.group h2 {
+  margin: 0 0 8px;
+  color: var(--ink-soft);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 5px;
+}
+
+.row label {
+  color: var(--ink);
+}
+
+output {
+  color: var(--ink-soft);
+  font-variant-numeric: tabular-nums;
+  font-weight: 650;
+}
+
+input[type="range"] {
+  width: 100%;
+  margin: 0;
+  accent-color: var(--accent);
+}
+
+.check {
+  display: flex;
+  gap: 9px;
+  align-items: center;
+  padding: 3px 0 8px;
+  cursor: pointer;
+}
+
+.check input {
+  width: 15px;
+  height: 15px;
+  margin: 0;
+  accent-color: var(--accent);
+}
+
+.stack {
+  display: block;
+  margin-top: 12px;
+}
+
+.stack > span {
+  display: block;
+  margin-bottom: 5px;
+  color: var(--ink-soft);
+  font-size: 11.5px;
+}
+
+textarea {
+  width: 100%;
+  padding: 8px 9px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--panel);
+  color: var(--ink);
+  font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.5;
+  resize: vertical;
+}
+
+textarea:focus-visible,
+input[type="range"]:focus-visible {
+  outline: 2px solid #8b9099;
+  outline-offset: 2px;
+}
+
+.foot {
+  display: flex;
+  flex: none;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 11px 16px;
+  border-top: 1px solid var(--line);
+  background: var(--panel);
+}
+
+button {
+  padding: 7px 14px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--panel);
+  color: var(--ink);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+button:hover {
+  border-color: #b9bdc4;
+}
+
+.primary {
+  border-color: #3a3d42;
+  background: #3a3d42;
+  color: #fff;
+}
+
+.primary:hover {
+  background: #2d2f33;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --ink: #e8eaec;
+    --ink-soft: #a2a7ad;
+    --line: #3a3d42;
+    --panel: #26282c;
+    --page: #1d1f22;
+  }
+
+  .primary {
+    border-color: #55595f;
+    background: #55595f;
+  }
+
+  .primary:hover {
+    background: #63676e;
+  }
+}

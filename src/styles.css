@@ -1,0 +1,239 @@
+:root {
+  color-scheme: light;
+  font-family: Inter, ui-rounded, "Segoe UI", system-ui, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+  background: transparent;
+  user-select: none;
+}
+
+body.preview {
+  background:
+    radial-gradient(circle at 75% 14%, rgb(255 255 255 / 76%), transparent 30%),
+    linear-gradient(145deg, #d9e7f1 0%, #c7d5e1 58%, #b8cad6 100%);
+}
+
+.preview-scene {
+  display: none;
+}
+
+body.preview .preview-scene {
+  position: absolute;
+  inset: 0;
+  display: block;
+  overflow: hidden;
+  color: #526476;
+}
+
+.preview-header {
+  position: absolute;
+  top: 24px;
+  left: 30px;
+  display: flex;
+  gap: 9px;
+  align-items: center;
+  padding: 9px 14px;
+  border: 1px solid rgb(255 255 255 / 65%);
+  border-radius: 999px;
+  background: rgb(255 255 255 / 58%);
+  box-shadow: 0 12px 35px rgb(57 82 105 / 12%);
+  font-size: 13px;
+  font-weight: 650;
+  letter-spacing: 0.02em;
+}
+
+.preview-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #70b995;
+  box-shadow: 0 0 0 4px rgb(112 185 149 / 15%);
+}
+
+.mock-window {
+  position: absolute;
+  overflow: hidden;
+  border: 1px solid rgb(255 255 255 / 80%);
+  border-radius: 16px;
+  background: rgb(248 251 253 / 76%);
+  box-shadow: 0 28px 70px rgb(49 70 90 / 18%);
+}
+
+.mock-window--back {
+  top: 100px;
+  right: 62px;
+  width: 470px;
+  height: 300px;
+  transform: rotate(2deg);
+  opacity: 0.75;
+}
+
+.mock-window--front {
+  top: 153px;
+  left: 94px;
+  width: 470px;
+  height: 286px;
+  transform: rotate(-1deg);
+}
+
+.mock-toolbar {
+  height: 38px;
+  border-bottom: 1px solid rgb(94 119 139 / 10%);
+  background:
+    radial-gradient(circle at 22px 19px, #f59492 0 4px, transparent 5px),
+    radial-gradient(circle at 38px 19px, #efc768 0 4px, transparent 5px),
+    radial-gradient(circle at 54px 19px, #79bf9b 0 4px, transparent 5px);
+}
+
+.mock-lines {
+  width: 70%;
+  height: 150px;
+  margin: 45px;
+  border-radius: 8px;
+  background: repeating-linear-gradient(
+    to bottom,
+    #dce5eb 0 8px,
+    transparent 8px 25px
+  );
+}
+
+.mock-card {
+  width: 78%;
+  height: 62px;
+  margin: 35px auto 18px;
+  border-radius: 12px;
+  background: #e5edf2;
+}
+
+.mock-card--short {
+  width: 58%;
+  height: 44px;
+  margin-top: 0;
+  margin-left: 11%;
+}
+
+.preview-note {
+  position: absolute;
+  top: 28px;
+  right: 35px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: rgb(255 255 255 / 55%);
+  font-size: 12px;
+}
+
+/* ---------------------------------------------------------------- cat shell */
+
+.cat {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 160px;
+  height: 150px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  outline: none;
+  background: transparent;
+  cursor: grab;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.cat:active {
+  cursor: grabbing;
+}
+
+/* Two stacked pixel layers: the cat mirrors when it turns around, the emote
+   layer never does, so floating hearts and Zs keep their drawn orientation. */
+.cat-layer {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  image-rendering: pixelated;
+  pointer-events: none;
+}
+
+.cat[data-direction="-1"] .cat-layer--body {
+  transform: scaleX(-1);
+}
+
+/* ------------------------------------------------------------ speech bubble */
+
+/* Squared corners and a thick flat outline to match the sprite's own outline,
+   rather than a soft tooltip that would look pasted on. */
+.bubble {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 4;
+  max-width: calc(100% - 6px);
+  padding: 7px 10px 8px;
+  border: 3px solid #2d2f33;
+  background: #f4f5f6;
+  color: #2d2f33;
+  font-size: 12.5px;
+  font-weight: 650;
+  line-height: 1.25;
+  text-align: center;
+  white-space: pre-wrap;
+  pointer-events: none;
+  animation: bubble-pop 140ms steps(3, end);
+}
+
+.bubble[hidden] {
+  display: none;
+}
+
+/* The tail: a stub rather than a smooth triangle, so it stays in keeping with
+   the blocky artwork. */
+.bubble::after {
+  content: "";
+  position: absolute;
+  bottom: -9px;
+  left: 50%;
+  width: 10px;
+  height: 6px;
+  margin-left: -8px;
+  border: 3px solid #2d2f33;
+  border-top: 0;
+  background: #f4f5f6;
+}
+
+@keyframes bubble-pop {
+  from {
+    opacity: 0;
+    transform: translateY(4px) scale(0.86);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.state-label {
+  position: absolute;
+  left: 50%;
+  bottom: -4px;
+  display: none;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: #2d2f33;
+  color: white;
+  font-size: 10px;
+  transform: translateX(-50%);
+}
+
+body.debug .state-label {
+  display: block;
+}

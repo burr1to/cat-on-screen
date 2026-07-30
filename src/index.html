@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; object-src 'none'"
+    />
+    <title>Kairo</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="preview-scene" aria-hidden="true">
+      <div class="preview-header">
+        <span class="preview-dot"></span>
+        Linux sandbox preview
+      </div>
+      <div class="mock-window mock-window--back">
+        <div class="mock-toolbar"></div>
+        <div class="mock-lines"></div>
+      </div>
+      <div class="mock-window mock-window--front">
+        <div class="mock-toolbar"></div>
+        <div class="mock-card"></div>
+        <div class="mock-card mock-card--short"></div>
+      </div>
+      <div class="preview-note">Kairo roams above your desktop without blocking it.</div>
+    </div>
+
+    <button id="cat" class="cat" type="button" aria-label="Kairo the desktop cat">
+      <canvas id="cat-canvas" class="cat-layer cat-layer--body" width="32" height="30"></canvas>
+      <canvas
+        id="emote-canvas"
+        class="cat-layer cat-layer--emote"
+        width="32"
+        height="30"
+        aria-hidden="true"
+      ></canvas>
+      <span class="state-label" aria-hidden="true"></span>
+    </button>
+
+    <!-- Kept outside the cat button so it never inherits the sprite's mirroring
+         when Kairo turns around. -->
+    <div id="bubble" class="bubble" role="status" hidden><span id="bubble-text"></span></div>
+
+    <script type="module" src="./renderer.mjs"></script>
+  </body>
+</html>

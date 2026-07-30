@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Kairo emote check</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 14px;
+        background: #cfd8de;
+        font: 11px/1.3 system-ui, sans-serif;
+        color: #2f3a44;
+      }
+      .grid {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+      figure {
+        margin: 0;
+      }
+      .stack {
+        position: relative;
+        width: 160px;
+        height: 150px;
+      }
+      canvas {
+        position: absolute;
+        inset: 0;
+        width: 160px;
+        height: 150px;
+        image-rendering: pixelated;
+      }
+      .stack {
+        outline: 1px solid rgb(47 58 68 / 20%);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="grid" id="grid"></div>
+    <script type="module">
+      import { createSprite, SPRITE_WIDTH, SPRITE_HEIGHT } from "./src/cat-sprite.mjs";
+
+      const grid = document.querySelector("#grid");
+
+      for (const state of ["happy", "sleep"]) {
+        for (const direction of [1, -1]) {
+          for (const now of [120, 460, 800, 1500]) {
+            const figure = document.createElement("figure");
+            const caption = document.createElement("figcaption");
+            caption.textContent = `${state} ${direction === 1 ? "→" : "←"} t=${now}`;
+            const stack = document.createElement("div");
+            stack.className = "stack";
+
+            const catCanvas = document.createElement("canvas");
+            const emoteCanvas = document.createElement("canvas");
+            for (const canvas of [catCanvas, emoteCanvas]) {
+              canvas.width = SPRITE_WIDTH;
+              canvas.height = SPRITE_HEIGHT;
+            }
+            if (direction === -1) catCanvas.style.transform = "scaleX(-1)";
+
+            stack.append(catCanvas, emoteCanvas);
+            figure.append(caption, stack);
+            grid.append(figure);
+
+            createSprite({ catCanvas, emoteCanvas }).render(state, direction, now);
+          }
+        }
+      }
+    </script>
+  </body>
+</html>
