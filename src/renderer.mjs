@@ -36,6 +36,9 @@ let previousTime = performance.now();
 let pointerStart = null;
 let scale = SCALE;
 let shownSpeech = null;
+const WINDOW_POSITION_INTERVAL_MS = 1000 / 30;
+let lastWindowPositionAt = -Infinity;
+let lastWindowPosition = null;
 
 // The window is only as big as Kairo plus bubble room, and he is pinned to the
 // bottom of it. Everything above him is bubble space.
@@ -175,7 +178,18 @@ function updateView(now) {
 
   if (!isPreview) {
     const origin = catOrigin();
-    window.desktopPet?.placeWindow({ x: engine.x - origin.x, y: engine.y - origin.y });
+    const position = { x: engine.x - origin.x, y: engine.y - origin.y };
+    const due = now - lastWindowPositionAt >= WINDOW_POSITION_INTERVAL_MS;
+    const changed =
+      !lastWindowPosition ||
+      position.x !== lastWindowPosition.x ||
+      position.y !== lastWindowPosition.y;
+
+    if (changed && due) {
+      window.desktopPet?.placeWindow(position);
+      lastWindowPosition = position;
+      lastWindowPositionAt = now;
+    }
   }
 
   layOutCat();
@@ -259,6 +273,8 @@ window.addEventListener("resize", layOutCat);
 window.desktopPet?.onStage((next) => {
   if (!next) return;
   stage = { ...stage, ...next };
+  lastWindowPosition = null;
+  lastWindowPositionAt = -Infinity;
   engine.setViewport(stage.world.width, stage.world.height);
   layOutCat();
 });

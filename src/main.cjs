@@ -130,6 +130,55 @@ let tray = null;
 let store = null;
 let isPaused = false;
 let isAlwaysOnTop = true;
+const WINDOW_MOVE_INTERVAL_MS = 1000 / 30;
+let catWindowSize = { width: 0, height: 0 };
+let pendingWindowPosition = null;
+let appliedWindowPosition = null;
+let windowMoveTimer = null;
+let lastWindowMoveAt = 0;
+
+function flushWindowPosition() {
+  windowMoveTimer = null;
+  if (!catWindow || !pendingWindowPosition) return;
+
+  const elapsed = Date.now() - lastWindowMoveAt;
+  if (elapsed < WINDOW_MOVE_INTERVAL_MS) {
+    windowMoveTimer = setTimeout(flushWindowPosition, WINDOW_MOVE_INTERVAL_MS - elapsed);
+    return;
+  }
+
+  const position = pendingWindowPosition;
+  pendingWindowPosition = null;
+
+  if (!appliedWindowPosition || position.x !== appliedWindowPosition.x || position.y !== appliedWindowPosition.y) {
+    catWindow.setPosition(position.x, position.y, false);
+    appliedWindowPosition = position;
+    lastWindowMoveAt = Date.now();
+  }
+
+  if (pendingWindowPosition && !windowMoveTimer) {
+    windowMoveTimer = setTimeout(flushWindowPosition, WINDOW_MOVE_INTERVAL_MS);
+  }
+}
+
+function requestWindowPosition(x, y) {
+  pendingWindowPosition = { x, y };
+  if (!windowMoveTimer) flushWindowPosition();
+}
+
+function setWindowPositionImmediately(x, y) {
+  if (!catWindow) return;
+
+  if (windowMoveTimer) {
+    clearTimeout(windowMoveTimer);
+    windowMoveTimer = null;
+  }
+
+  pendingWindowPosition = null;
+  catWindow.setPosition(x, y, false);
+  appliedWindowPosition = { x, y };
+  lastWindowMoveAt = Date.now();
+}
 
 function createCatWindow() {
   // A full-screen transparent overlay is the obvious way to build a desktop pet
@@ -180,15 +229,12 @@ function createCatWindow() {
       preload: path.join(__dirname, "preload.cjs"),
       contextIsolation: true,
       nodeIntegration: false,
-      sandbox: true,
-      // Kairo's physics run on requestAnimationFrame, and Chromium throttles
-      // that to a crawl for windows it believes are hidden or off-screen. A hard
-      // throw once carried him off the top of the screen, the loop stopped, and
-      // he froze mid-air permanently -- "Call Kairo back" could not rescue him
-      // because applying the new position needs a frame that never arrived.
-      backgroundThrottling: false
+      sandbox: true
     }
   });
+
+  catWindowSize = { width: bounds.width, height: bounds.height };
+  appliedWindowPosition = { x: bounds.x, y: bounds.y };
 
   catWindow.setMenu(null);
 
@@ -214,6 +260,9 @@ function createCatWindow() {
   });
 
   catWindow.on("closed", () => {
+    if (windowMoveTimer) clearTimeout(windowMoveTimer);
+    windowMoveTimer = null;
+    pendingWindowPosition = null;
     catWindow = null;
   });
 
@@ -316,9 +365,9 @@ function publishStage() {
   const stage = stageFor();
   stageOrigin = stage.origin;
 
-  const bounds = catWindow.getBounds();
-  if (bounds.width !== stage.window.width || bounds.height !== stage.window.height) {
-    catWindow.setBounds({ ...bounds, width: stage.window.width, height: stage.window.height });
+  if (catWindowSize.width !== stage.window.width || catWindowSize.height !== stage.window.height) {
+    catWindow.setSize(stage.window.width, stage.window.height, false);
+    catWindowSize = { width: stage.window.width, height: stage.window.height };
   }
 
   // `full` must be sent explicitly, not left out: the renderer merges stage
@@ -337,12 +386,10 @@ function recentreWindow() {
   if (!catWindow || isCaptureMode) return;
 
   const stage = stageFor();
-  catWindow.setBounds({
-    x: stage.origin.x + Math.round((stage.world.width - stage.window.width) / 2),
-    y: stage.origin.y + stage.world.height - stage.window.height,
-    width: stage.window.width,
-    height: stage.window.height
-  });
+  setWindowPositionImmediately(
+    stage.origin.x + Math.round((stage.world.width - stage.window.width) / 2),
+    stage.origin.y + stage.world.height - stage.window.height
+  );
 }
 
 function openSettingsWindow() {
@@ -484,15 +531,13 @@ function createTray() {
   updateTrayMenu();
 }
 
-// Called once per animation frame with where the window should be, in stage
-// coordinates. Kairo himself is drawn at a fixed spot inside the window, so all
-// of his movement is the window moving -- there is no way for the sprite and the
-// window to disagree and jitter.
+// Called with where the window should be, in stage coordinates. The renderer
+// may produce frames faster than the desktop window manager needs to move, so
+// requestWindowPosition coalesces them before touching the native window.
 ipcMain.on("cat:frame", (event, frame) => {
   if (BrowserWindow.fromWebContents(event.sender) !== catWindow || isCaptureMode) return;
   if (!frame || !Number.isFinite(frame.x) || !Number.isFinite(frame.y)) return;
 
-  const bounds = catWindow.getBounds();
   const area = screen.getPrimaryDisplay().workArea;
 
   // Belt and braces for the freeze described above: whatever the engine asks
@@ -501,18 +546,16 @@ ipcMain.on("cat:frame", (event, frame) => {
   const margin = 60;
   const x = clampRange(
     stageOrigin.x + Math.round(frame.x),
-    area.x - bounds.width + margin,
+    area.x - catWindowSize.width + margin,
     area.x + area.width - margin
   );
   const y = clampRange(
     stageOrigin.y + Math.round(frame.y),
-    area.y - bounds.height + margin,
+    area.y - catWindowSize.height + margin,
     area.y + area.height - margin
   );
 
-  if (bounds.x !== x || bounds.y !== y) {
-    catWindow.setBounds({ x, y, width: bounds.width, height: bounds.height });
-  }
+  requestWindowPosition(x, y);
 });
 
 ipcMain.on("cat:settings-request", (event) => {

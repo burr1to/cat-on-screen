@@ -1,5 +1,12 @@
 # Release notes
 
+## 0.1.3 — 31 July 2026
+
+### Fixed
+
+- Reduced desktop resource usage by coalescing native window movement and
+  allowing hidden Kairo windows to be throttled.
+
 ## 0.1.2 — 31 July 2026
 
 Maintenance release.
