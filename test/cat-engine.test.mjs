@@ -76,8 +76,17 @@ test("idle behaviours are reachable and none of them drift the cat", () => {
   for (const state of [
     "idle",
     "sit",
+    "loaf",
     "groom",
     "lick",
+    "knead",
+    "scratch",
+    "yawn",
+    "drink",
+    "perk",
+    "blink",
+    "crouch",
+    "chase",
     "roll",
     "stretch",
     "sleep",
@@ -103,7 +112,7 @@ test("reset and viewport changes keep the cat on screen", () => {
 
 
 test("speech appears on a randomised schedule and expires on its own", () => {
-  const engine = new CatEngine({ width: 900, height: 600, random: () => 0.5 });
+  const engine = new CatEngine({ width: 900, height: 600, random: createSeededRandom(7) });
   engine.configureSpeech({ enabled: true, gapSeconds: 20, phrases: ["Meow", "Hello"] }, 0);
 
   let firstSpokeAt = null;
@@ -204,4 +213,31 @@ test("pausing mid-drag before letting go drops him instead of throwing him", () 
     Math.hypot(engine.vx, engine.vy) < 60,
     `still had ${Math.hypot(engine.vx, engine.vy).toFixed(0)}px/s after holding still`
   );
+});
+
+test("landing hard earns a shake-off, landing gently does not", () => {
+  function land(dropFrom) {
+    const engine = new CatEngine({ width: 1920, height: 1040, random: () => 0.5 });
+    engine.y = engine.groundY - dropFrom;
+    engine.onGround = false;
+    engine.shakeOnLand = true;
+    engine.state = "fall";
+
+    for (let frame = 0; frame < 300 && !engine.onGround; frame += 1) {
+      engine.step(1 / 60, frame * (1000 / 60));
+    }
+
+    return engine.state;
+  }
+
+  assert.equal(land(300), "shake", "a real drop should be shaken off");
+  assert.equal(land(1), "idle", "stepping off a kerb should not");
+
+  // His own jump is not something he needs to recover from.
+  const jumper = new CatEngine({ width: 1920, height: 1040, random: () => 0.5 });
+  jumper.jump(0);
+  for (let frame = 0; frame < 400 && !jumper.onGround; frame += 1) {
+    jumper.step(1 / 60, frame * (1000 / 60));
+  }
+  assert.equal(jumper.state, "idle", "a plain jump should not end in a shake");
 });

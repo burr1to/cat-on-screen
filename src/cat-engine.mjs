@@ -10,6 +10,10 @@ const DEFAULTS = Object.freeze({
   jumpSpeed: 570,
   throwScale: 1.15,
   maxThrowSpeed: 1300,
+  // Landing harder than this earns a shake-off rather than a shrug, so being
+  // thrown gets an answer.
+  shakeThreshold: 120,
+  shakeMs: 620,
   speechHoldMs: 3800
 });
 
@@ -33,6 +37,7 @@ export class CatEngine {
     this.lastPointer = null;
     this.nextDecisionAt = now + 900;
     this.happyUntil = 0;
+    this.shakeOnLand = false;
 
     // { text, until } while a speech bubble is showing, otherwise null.
     this.speech = null;
@@ -92,7 +97,10 @@ export class CatEngine {
       this.dragging ||
       !this.onGround ||
       this.state === "sleep" ||
-      this.state === "roll"
+      this.state === "roll" ||
+      this.state === "shake" ||
+      this.state === "yawn" ||
+      this.state === "drink"
     ) {
       this.nextSpeechAt = now + 2000;
       return;
@@ -106,6 +114,7 @@ export class CatEngine {
   }
 
   setViewport(width, height) {
+    this.shakeOnLand = false;
     this.width = width;
     this.height = height;
     this.x = clamp(this.x, 0, this.maxX);
@@ -145,6 +154,7 @@ export class CatEngine {
     if (this.dragging || !this.onGround || this.paused) return false;
     this.state = "jump";
     this.onGround = false;
+    this.shakeOnLand = false;
     this.vx = this.direction * this.options.walkSpeed * 1.6;
     this.vy = -this.options.jumpSpeed;
     this.nextDecisionAt = now + 1200;
@@ -191,6 +201,7 @@ export class CatEngine {
     this.lastPointer = null;
 
     if (toss) {
+      this.shakeOnLand = true;
       this.vx *= this.options.throwScale;
       this.vy *= this.options.throwScale;
       this.state = this.vy < 0 ? "jump" : "fall";
@@ -243,11 +254,14 @@ export class CatEngine {
           this.vx *= 0.72;
           this.state = "jump";
         } else {
+          const landedHard =
+            this.shakeOnLand && Math.abs(this.vy) > this.options.shakeThreshold;
+          this.shakeOnLand = false;
           this.vy = 0;
           this.vx = 0;
           this.onGround = true;
-          this.state = "idle";
-          this.nextDecisionAt = now + 700;
+          this.state = landedHard ? "shake" : "idle";
+          this.nextDecisionAt = now + (landedHard ? this.options.shakeMs : 700);
         }
       } else {
         this.state = this.vy < 0 ? "jump" : "fall";
@@ -275,32 +289,59 @@ export class CatEngine {
     this.vx = 0;
     this.vy = 0;
 
-    if (roll < 0.09) {
+    if (roll < 0.05) {
       this.state = "idle";
       this.nextDecisionAt = now + range(this.random, 1400, 3000);
-    } else if (roll < 0.16) {
+    } else if (roll < 0.09) {
       this.state = "sit";
       this.nextDecisionAt = now + range(this.random, 2400, 5000);
-    } else if (roll < 0.21) {
+    } else if (roll < 0.13) {
+      this.state = "loaf";
+      this.nextDecisionAt = now + range(this.random, 3500, 7000);
+    } else if (roll < 0.16) {
       this.state = "groom";
       this.nextDecisionAt = now + range(this.random, 1900, 3400);
-    } else if (roll < 0.26) {
+    } else if (roll < 0.19) {
       this.state = "lick";
       this.nextDecisionAt = now + range(this.random, 2200, 3800);
-    } else if (roll < 0.31) {
+    } else if (roll < 0.22) {
+      this.state = "knead";
+      this.nextDecisionAt = now + range(this.random, 2400, 4200);
+    } else if (roll < 0.25) {
+      this.state = "scratch";
+      this.nextDecisionAt = now + range(this.random, 1600, 2600);
+    } else if (roll < 0.28) {
+      this.state = "yawn";
+      this.nextDecisionAt = now + range(this.random, 1800, 2600);
+    } else if (roll < 0.30) {
+      this.state = "drink";
+      this.nextDecisionAt = now + range(this.random, 2200, 3600);
+    } else if (roll < 0.33) {
+      this.state = "perk";
+      this.nextDecisionAt = now + range(this.random, 1400, 2600);
+    } else if (roll < 0.36) {
+      this.state = "blink";
+      this.nextDecisionAt = now + range(this.random, 1800, 3000);
+    } else if (roll < 0.39) {
+      this.state = "crouch";
+      this.nextDecisionAt = now + range(this.random, 1600, 2800);
+    } else if (roll < 0.42) {
+      this.state = "chase";
+      this.nextDecisionAt = now + range(this.random, 3000, 5000);
+    } else if (roll < 0.45) {
       this.state = "roll";
       this.nextDecisionAt = now + range(this.random, 2600, 4400);
-    } else if (roll < 0.35) {
+    } else if (roll < 0.47) {
       this.state = "stretch";
       this.nextDecisionAt = now + range(this.random, 1300, 2100);
-    } else if (roll < 0.44) {
+    } else if (roll < 0.55) {
       this.state = "sleep";
       this.nextDecisionAt = now + range(this.random, 4500, 8500);
-    } else if (roll < 0.76) {
+    } else if (roll < 0.85) {
       this.state = "walk";
       if (this.random() < 0.3) this.direction *= -1;
       this.nextDecisionAt = now + range(this.random, 2600, 5200);
-    } else if (roll < 0.93) {
+    } else if (roll < 0.96) {
       this.state = "run";
       if (this.random() < 0.2) this.direction *= -1;
       this.nextDecisionAt = now + range(this.random, 1600, 3200);

@@ -36,9 +36,24 @@ let previousTime = performance.now();
 let pointerStart = null;
 let scale = SCALE;
 let shownSpeech = null;
-const WINDOW_POSITION_INTERVAL_MS = 1000 / 30;
-let lastWindowPositionAt = -Infinity;
+
+// Everything that touches the DOM or a canvas runs at this rate rather than at
+// the display's refresh rate. Nothing can appear faster than this anyway: the
+// window is only moved 30 times a second, and the quickest sprite animation is
+// 11 frames a second. Painting more often only costs a compositing pass over the
+// desktop -- which on Windows is DWM work on a transparent always-on-top window,
+// and is where most of Kairo's CPU went on a 60Hz or 144Hz screen.
+const RENDER_INTERVAL_MS = 1000 / 30;
+let lastRenderAt = -Infinity;
 let lastWindowPosition = null;
+
+// What the DOM was last told. Writing an identical value still invalidates style
+// and layout for the element, so every write below is gated on a change.
+let lastTransform = null;
+let lastState = null;
+let lastDirection = null;
+let lastBubbleTransform = null;
+let bubbleSize = null;
 
 // The window is only as big as Kairo plus bubble room, and he is pinned to the
 // bottom of it. Everything above him is bubble space.
@@ -116,12 +131,19 @@ function applyScale(nextScale) {
   engine.options.catWidth = width;
   engine.options.catHeight = height;
   engine.setViewport(stage.world.width, stage.world.height);
+  // The bubble's max-width is a share of the window, so a resize can change how
+  // a line wraps.
+  bubbleSize = null;
   layOutCat();
 }
 
 function layOutCat() {
   const origin = catOrigin();
-  catElement.style.transform = `translate3d(${Math.round(origin.x)}px, ${Math.round(origin.y)}px, 0)`;
+  const transform = `translate3d(${Math.round(origin.x)}px, ${Math.round(origin.y)}px, 0)`;
+  if (transform === lastTransform) return;
+
+  catElement.style.transform = transform;
+  lastTransform = transform;
 }
 
 function updateBubble() {
@@ -131,6 +153,8 @@ function updateBubble() {
     if (shownSpeech !== null) {
       bubbleElement.hidden = true;
       shownSpeech = null;
+      bubbleSize = null;
+      lastBubbleTransform = null;
     }
     return;
   }
@@ -143,10 +167,20 @@ function updateBubble() {
     bubbleElement.style.animation = "none";
     void bubbleElement.offsetWidth;
     bubbleElement.style.animation = "";
+    bubbleSize = null;
   }
 
-  const width = bubbleElement.offsetWidth;
-  const height = bubbleElement.offsetHeight;
+  // Reading offsetWidth forces the browser to finish layout there and then.
+  // Measuring per frame did that for every frame of the four seconds a line is
+  // up; the box only changes when the text or the window does, so measure then.
+  if (!bubbleSize) {
+    bubbleSize = {
+      width: bubbleElement.offsetWidth,
+      height: bubbleElement.offsetHeight
+    };
+  }
+
+  const { width, height } = bubbleSize;
   const origin = catOrigin();
   const headOffset =
     engine.direction === 1
@@ -159,41 +193,59 @@ function updateBubble() {
     Math.min(Math.max(origin.x + headOffset - width / 2, 0), Math.max(0, pageWidth() - width))
   );
   const top = Math.round(Math.max(0, origin.y - height - 2));
+  const transform = `translate3d(${left}px, ${top}px, 0)`;
 
-  bubbleElement.style.transform = `translate3d(${left}px, ${top}px, 0)`;
+  if (transform === lastBubbleTransform) return;
+  bubbleElement.style.transform = transform;
+  lastBubbleTransform = transform;
 }
 
 function updateView(now) {
   const elapsed = (now - previousTime) / 1000;
   previousTime = now;
+
+  // The simulation is cheap and stays on every frame, so physics is unchanged;
+  // it is the painting below that is capped.
   engine.step(elapsed, now);
 
-  catElement.dataset.state = engine.state;
-  catElement.dataset.direction = String(engine.direction);
-  stateLabel.textContent = engine.state;
+  // The tolerance keeps a 30Hz screen from dropping every other frame to jitter.
+  if (now - lastRenderAt >= RENDER_INTERVAL_MS - 1) {
+    lastRenderAt = now;
+    draw(now);
+  }
+
+  window.requestAnimationFrame(updateView);
+}
+
+function draw(now) {
+  if (engine.state !== lastState) {
+    catElement.dataset.state = engine.state;
+    stateLabel.textContent = engine.state;
+    lastState = engine.state;
+  }
+
+  if (engine.direction !== lastDirection) {
+    catElement.dataset.direction = String(engine.direction);
+    lastDirection = engine.direction;
+  }
 
   layOutCat();
   sprite.render(engine.state, engine.direction, now);
   updateBubble();
 
-  if (!isPreview) {
-    const origin = catOrigin();
-    const position = { x: engine.x - origin.x, y: engine.y - origin.y };
-    const due = now - lastWindowPositionAt >= WINDOW_POSITION_INTERVAL_MS;
-    const changed =
-      !lastWindowPosition ||
-      position.x !== lastWindowPosition.x ||
-      position.y !== lastWindowPosition.y;
+  if (isPreview) return;
 
-    if (changed && due) {
-      window.desktopPet?.placeWindow(position);
-      lastWindowPosition = position;
-      lastWindowPositionAt = now;
-    }
+  const origin = catOrigin();
+  const position = { x: engine.x - origin.x, y: engine.y - origin.y };
+  const changed =
+    !lastWindowPosition ||
+    position.x !== lastWindowPosition.x ||
+    position.y !== lastWindowPosition.y;
+
+  if (changed) {
+    window.desktopPet?.placeWindow(position);
+    lastWindowPosition = position;
   }
-
-  layOutCat();
-window.requestAnimationFrame(updateView);
 }
 
 // The sprite is much smaller than its element box -- the headroom above the cat
@@ -268,13 +320,16 @@ catElement.addEventListener("keydown", (event) => {
   }
 });
 
-window.addEventListener("resize", layOutCat);
+window.addEventListener("resize", () => {
+  bubbleSize = null;
+  layOutCat();
+});
 
 window.desktopPet?.onStage((next) => {
   if (!next) return;
   stage = { ...stage, ...next };
   lastWindowPosition = null;
-  lastWindowPositionAt = -Infinity;
+  bubbleSize = null;
   engine.setViewport(stage.world.width, stage.world.height);
   layOutCat();
 });

@@ -75,6 +75,17 @@ function clampRange(value, minimum, maximum) {
   return Math.min(maximum, Math.max(minimum, value));
 }
 
+// Asking the OS for the display list is not free, and the clamp below runs on
+// every position update -- 30 times a second while Kairo is on the move. The
+// answer only changes when a display does, and every one of those raises an
+// event that clears this.
+let cachedWorkArea = null;
+
+function primaryWorkArea() {
+  if (!cachedWorkArea) cachedWorkArea = screen.getPrimaryDisplay().workArea;
+  return cachedWorkArea;
+}
+
 function windowSizeFor(scale) {
   return {
     width: Math.max(SPRITE_CELLS.width * scale, MIN_WINDOW_WIDTH),
@@ -87,6 +98,7 @@ function windowSizeFor(scale) {
 function stageFor() {
   const display = screen.getPrimaryDisplay();
   const workArea = display.workArea;
+  cachedWorkArea = workArea;
   const scale = store?.get().scale ?? 5;
   const size = windowSizeFor(scale);
 
@@ -535,10 +547,10 @@ function createTray() {
 // may produce frames faster than the desktop window manager needs to move, so
 // requestWindowPosition coalesces them before touching the native window.
 ipcMain.on("cat:frame", (event, frame) => {
-  if (BrowserWindow.fromWebContents(event.sender) !== catWindow || isCaptureMode) return;
+  if (event.sender !== catWindow?.webContents || isCaptureMode) return;
   if (!frame || !Number.isFinite(frame.x) || !Number.isFinite(frame.y)) return;
 
-  const area = screen.getPrimaryDisplay().workArea;
+  const area = primaryWorkArea();
 
   // Belt and braces for the freeze described above: whatever the engine asks
   // for, keep a strip of the window on screen so it can never become invisible
@@ -610,9 +622,14 @@ if (!hasSingleInstanceLock) {
   app.on("second-instance", () => sendCommand("reset"));
 
   app.whenReady().then(() => {
-    screen.on("display-metrics-changed", () => publishStage());
-    screen.on("display-added", () => publishStage());
-    screen.on("display-removed", () => publishStage());
+    const displaysChanged = () => {
+      cachedWorkArea = null;
+      publishStage();
+    };
+
+    screen.on("display-metrics-changed", displaysChanged);
+    screen.on("display-added", displaysChanged);
+    screen.on("display-removed", displaysChanged);
     store = createStore(app.getPath("userData"));
     isAlwaysOnTop = store.get().alwaysOnTop;
     updater = createUpdater({

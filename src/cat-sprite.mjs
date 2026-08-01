@@ -11,16 +11,18 @@ export const SPRITE_HEIGHT = 30;
 export const CAT_TOP = 6;
 export const SCALE = 5;
 
-// One flat grey coat -- same tone top and bottom. Shape reads from the dark
-// outline alone, so the only other colours are the face accents.
+// A deeper grey coat with the old tone kept as a lighter accent on the muzzle,
+// paws and tail tip -- enough to give him some shape without going back to a
+// patchy two-colour cat.
 const PALETTE = {
   o: "#2d2f33", // outline
-  m: "#6f7276", // fur, everywhere
+  m: "#55585c", // fur, base coat
+  l: "#6f7276", // fur, light accent
   p: "#a3808a", // inner ear
   b: "#b4868f", // blush
   n: "#8a636a", // nose
   e: "#23252a", // eye
-  g: "#eef0f2", // eye glint
+  g: "#f2c94c", // eye glint, yellow
   h: "#cf5c72", // heart
   z: "#3f4247", // sleep letters
   c: "#3f6fb5", // collar
@@ -46,10 +48,10 @@ const PARTS = {
     "ommmmmmmmmmmmo",
     "ommmmmmmmmmmmo",
     "ommmmmmmmmmmmo",
-    "obbmmmnnmmmbbo",
-    "ombmmommommbmo",
-    ".ommmmoommmmo.",
-    "..ommmmmmmmo..",
+    "obbmllnnllmbbo",
+    "ombmlollolmbmo",
+    ".ommlloollmmo.",
+    "..omllllllmo..",
     "...oommmmoo...",
     ".....oooo....."
   ],
@@ -94,17 +96,17 @@ const PARTS = {
     ".ooooooooooooooo."
   ],
 
-  leg: ["ommo.", "ommo.", "ommmo", "ooooo"],
+  leg: ["ommo.", "ommo.", "olllo", "ooooo"],
   legFold: [".ooooo.", "ommmmmo", "ommmmmo", ".ooooo."],
-  legTuck: ["ommmo", "ooooo"],
-  legPaw: [".oo.", "ommo", "ommo", "oooo"],
+  legTuck: ["olllo", "ooooo"],
+  legPaw: [".oo.", "ollo", "ollo", "oooo"],
 
   // Every tail ends on rows 15-17 at columns 6-7, which is where the rump
   // outline sits, so the base is always tucked behind the body.
   tailMid: [
     "..ooo...",
-    ".ommo...",
-    ".ommo...",
+    ".ollo...",
+    ".ollo...",
     "ommmo...",
     "ommmo...",
     ".ommmo..",
@@ -115,9 +117,9 @@ const PARTS = {
   ],
   tailUp: [
     "..ooo...",
-    ".ommo...",
-    ".ommo...",
-    "ommmo...",
+    ".ollo...",
+    ".ollo...",
+    "ollmo...",
     "ommmo...",
     "ommmo...",
     "ommmo...",
@@ -131,8 +133,8 @@ const PARTS = {
   ],
   tailLow: [
     "..oooooooo",
-    ".ommmmmmmm",
-    "ommmmmmmmm",
+    ".ollmmmmmm",
+    "ollmmmmmmm",
     ".ommmmmmmm",
     "..oooooooo"
   ],
@@ -156,6 +158,15 @@ const PARTS = {
   // either end so the silhouette is unbroken.
   collar: [".cCCCCCCc.", "...cccc..."],
   bell: [".oo.", "oYyo", "oyyo", ".oo."],
+
+  // Yawn: replaces the closed mouth on the muzzle, at head-local (5, 10).
+  mouthOpen: [".oo.", "otto", "otto", ".oo."],
+
+  // A hind leg brought up to the ear.
+  legScratch: [".oo.", "ollo", "ollo", "ommo", "ommo", ".oo."],
+
+  // Something small and irritating for him to chase.
+  bug: [".l.l.", "..o..", ".l.l."],
 
   heart: [".h.h.", "hhhhh", ".hhh.", "..h.."],
   zed: ["zzzz", "...z", "..z.", ".z..", "zzzz"]
@@ -393,6 +404,198 @@ const POSES = {
     ["tongue", 20, 22]
   ],
 
+  // Loaf: paws folded away underneath, body on the ground, but wide awake --
+  // which is what separates it from sleeping.
+  loaf: [
+    ["tailLow", 0, 17],
+    ["body", 6, 12],
+    ["head", 16, 4],
+    ["eyesOpen", 18, 10]
+  ],
+  loafBreathe: [
+    ["tailLow", 0, 17],
+    ["body", 6, 12],
+    ["head", 16, 3],
+    ["eyesOpen", 18, 9]
+  ],
+  loafBlink: [
+    ["tailLow", 0, 17],
+    ["body", 6, 12],
+    ["head", 16, 4],
+    ["eyesLine", 18, 11]
+  ],
+
+  // About to pounce: low to the ground, tail flat, rear end wiggling.
+  crouchLeft: [
+    ["tailLow", 0, 16],
+    ["body", 6, 11],
+    ["leg", 9, 20],
+    ["leg", 17, 20],
+    ["head", 16, 4],
+    ["eyesOpen", 18, 10]
+  ],
+  crouchRight: [
+    ["tailLow", 1, 16],
+    ["body", 7, 11],
+    ["leg", 10, 20],
+    ["leg", 17, 20],
+    ["head", 16, 4],
+    ["eyesOpen", 18, 10]
+  ],
+
+  // Making biscuits: front paws working alternately.
+  kneadLeft: [
+    ["tailLow", 2, 18],
+    ["bodySit", 9, 9],
+    ["legPaw", 18, 19],
+    ["head", 16, 3],
+    ["eyesArch", 18, 10],
+    ["legPaw", 22, 17]
+  ],
+  kneadRight: [
+    ["tailLow", 2, 18],
+    ["bodySit", 9, 9],
+    ["legPaw", 18, 17],
+    ["head", 16, 3],
+    ["eyesArch", 18, 10],
+    ["legPaw", 22, 19]
+  ],
+
+  // Heard something.
+  perk: [
+    ["tailUp", 0, 3],
+    ["body", 6, 9],
+    ["leg", 9, 20],
+    ["leg", 17, 20],
+    ["head", 16, 1],
+    ["eyesOpen", 18, 7]
+  ],
+  perkTail: [
+    ["tailUp", 1, 3],
+    ["body", 6, 9],
+    ["leg", 9, 20],
+    ["leg", 17, 20],
+    ["head", 16, 1],
+    ["eyesOpen", 18, 7]
+  ],
+
+  // A slow, deliberate blink -- how a cat says it likes you.
+  standArch: [
+    ["tailMid", 0, 8],
+    ["body", 6, 9],
+    ["leg", 9, 20],
+    ["leg", 17, 20],
+    ["head", 16, 2],
+    ["eyesArch", 18, 9]
+  ],
+  standArchLow: [
+    ["tailMid", 0, 8],
+    ["body", 6, 9],
+    ["leg", 9, 20],
+    ["leg", 17, 20],
+    ["head", 16, 3],
+    ["eyesArch", 18, 10]
+  ],
+
+  // Shaking himself off after a landing.
+  shakeLeft: [
+    ["tailMid", 0, 8],
+    ["body", 5, 9],
+    ["leg", 9, 20],
+    ["leg", 17, 20],
+    ["head", 15, 2],
+    ["eyesLine", 17, 9]
+  ],
+  shakeRight: [
+    ["tailUp", 1, 6],
+    ["body", 7, 9],
+    ["leg", 9, 20],
+    ["leg", 17, 20],
+    ["head", 17, 2],
+    ["eyesLine", 19, 9]
+  ],
+
+  // Head right down, tongue out.
+  drinkDown: [
+    ["tailLow", 0, 14],
+    ["body", 6, 9],
+    ["leg", 9, 20],
+    ["leg", 17, 20],
+    ["head", 16, 7],
+    ["eyesArch", 18, 14],
+    ["tongue", 21, 22]
+  ],
+  drinkUp: [
+    ["tailLow", 0, 14],
+    ["body", 6, 9],
+    ["leg", 9, 20],
+    ["leg", 17, 20],
+    ["head", 16, 6],
+    ["eyesArch", 18, 13],
+    ["tongue", 21, 20]
+  ],
+
+  // A proper jaw-cracking yawn, sitting down.
+  yawnStart: [
+    ["tailLow", 2, 18],
+    ["bodySit", 9, 9],
+    ["legTuck", 20, 22],
+    ["head", 16, 3],
+    ["eyesLine", 18, 10]
+  ],
+  yawnWide: [
+    ["tailLow", 2, 18],
+    ["bodySit", 9, 9],
+    ["legTuck", 20, 22],
+    ["head", 16, 3],
+    ["eyesLine", 18, 10],
+    ["mouthOpen", 21, 13]
+  ],
+
+  // Hind leg up behind the ear.
+  scratchUp: [
+    ["tailLow", 2, 18],
+    ["bodySit", 9, 9],
+    ["legTuck", 20, 22],
+    ["head", 16, 4],
+    ["eyesLine", 18, 11],
+    ["legScratch", 14, 6]
+  ],
+  scratchDown: [
+    ["tailLow", 2, 18],
+    ["bodySit", 9, 9],
+    ["legTuck", 20, 22],
+    ["head", 16, 4],
+    ["eyesLine", 18, 11],
+    ["legScratch", 14, 8]
+  ],
+
+  // Watching something fly about, then springing at it.
+  chaseWatch: [
+    ["tailLow", 0, 16],
+    ["body", 6, 11],
+    ["leg", 9, 20],
+    ["leg", 17, 20],
+    ["head", 16, 3],
+    ["eyesOpen", 18, 9]
+  ],
+  chaseWiggle: [
+    ["tailUp", 0, 6],
+    ["body", 7, 11],
+    ["leg", 10, 20],
+    ["leg", 17, 20],
+    ["head", 16, 3],
+    ["eyesOpen", 18, 9]
+  ],
+  chasePounce: [
+    ["tailUp", 0, 3],
+    ["body", 6, 8],
+    ["legTuck", 10, 20],
+    ["legTuck", 17, 20],
+    ["head", 16, 0],
+    ["eyesOpen", 18, 6]
+  ],
+
   happyUp: [
     ["tailUp", 0, 3],
     ["body", 6, 8],
@@ -422,6 +625,16 @@ const ANIMATIONS = {
   stretch: { fps: 1.4, poses: ["stretch", "stretchDeep"] },
   sleep: { fps: 0.5, poses: ["sleep", "sleepTwitch"] },
   roll: { fps: 2.2, poses: ["rollA", "rollB"] },
+  loaf: { fps: 0.9, poses: ["loaf", "loafBreathe", "loaf", "loafBlink"] },
+  crouch: { fps: 5, poses: ["crouchLeft", "crouchRight"] },
+  knead: { fps: 3, poses: ["kneadLeft", "kneadRight"] },
+  perk: { fps: 1.4, poses: ["perk", "perkTail"] },
+  blink: { fps: 0.8, poses: ["stand", "standArch", "standArchLow", "standArch"] },
+  shake: { fps: 9, poses: ["shakeLeft", "shakeRight"] },
+  drink: { fps: 3.2, poses: ["drinkDown", "drinkUp"] },
+  yawn: { fps: 1.6, poses: ["yawnStart", "yawnWide", "yawnWide", "yawnStart"] },
+  scratch: { fps: 7, poses: ["scratchUp", "scratchDown"] },
+  chase: { fps: 3, poses: ["chaseWatch", "chaseWiggle", "chaseWatch", "chasePounce"] },
   lick: { fps: 3.6, poses: ["lickA", "lickB"] },
   jump: { fps: 1, poses: ["jump"] },
   fall: { fps: 1, poses: ["fall"] },
@@ -437,6 +650,13 @@ const EMOTES = {
     count: 3,
     columns: [16, 21, 26],
     rise: [8, -3]
+  },
+  chase: {
+    part: "bug",
+    period: 2200,
+    count: 1,
+    columns: [20],
+    rise: [10, 2]
   },
   sleep: {
     part: "zed",
@@ -457,12 +677,23 @@ function paintPart(context, name, x, y) {
 
   for (let row = 0; row < rows.length; row += 1) {
     const line = rows[row];
+    let runKey = ".";
+    let runStart = 0;
 
-    for (let column = 0; column < line.length; column += 1) {
-      const key = line[column];
-      if (key === ".") continue;
-      context.fillStyle = PALETTE[key];
-      context.fillRect(x + column, y + row, 1, 1);
+    // Pixel art is mostly flat runs of one colour, so a row is filled a run at a
+    // time. The one-pixel-at-a-time version set fillStyle and issued a fillRect
+    // for every single pixel, which is the bulk of the cost of drawing an emote.
+    for (let column = 0; column <= line.length; column += 1) {
+      const key = column < line.length ? line[column] : ".";
+      if (key === runKey) continue;
+
+      if (runKey !== ".") {
+        context.fillStyle = PALETTE[runKey];
+        context.fillRect(x + runStart, y + row, column - runStart, 1);
+      }
+
+      runKey = key;
+      runStart = column;
     }
   }
 }
@@ -474,32 +705,59 @@ function createCanvas(width, height) {
   return canvas;
 }
 
-// The single place a pose is turned into pixels. Exported so tooling draws Kairo
-// exactly the way the app does -- a harness that reimplements this loop silently
-// misses anything added here, like the collar.
-export function paintPose(context, name, offsetY = 0) {
+// The single place the layer stack of a pose is expanded, so the painter and the
+// hit-test mask below can never disagree about where the collar and bell land.
+function forEachLayer(name, offsetY, visit) {
   for (const [part, x, y] of POSES[name]) {
-    paintPart(context, part, x, y + offsetY);
+    visit(part, x, y + offsetY);
 
     // Immediately after the head, so it covers the chin but still sits behind a
     // raised grooming paw.
     if (part === "head") {
-      paintPart(context, "collar", x + COLLAR_OFFSET.x, y + COLLAR_OFFSET.y + offsetY);
-      paintPart(
-        context,
-        "bell",
-        x + BELL_OFFSET.x + (BELL_SWING[name] ?? 0),
-        y + BELL_OFFSET.y + offsetY
-      );
+      visit("collar", x + COLLAR_OFFSET.x, y + COLLAR_OFFSET.y + offsetY);
+      visit("bell", x + BELL_OFFSET.x + (BELL_SWING[name] ?? 0), y + BELL_OFFSET.y + offsetY);
     }
   }
+}
+
+// The single place a pose is turned into pixels. Exported so tooling draws Kairo
+// exactly the way the app does -- a harness that reimplements this loop silently
+// misses anything added here, like the collar.
+export function paintPose(context, name, offsetY = 0) {
+  forEachLayer(name, offsetY, (part, x, y) => paintPart(context, part, x, y));
+}
+
+// Which pixels of a pose are painted at all, walked from the same layer stack.
+// Hit testing used to read the pixel back off the canvas, and getImageData on a
+// GPU-backed canvas forces a readback that stalls the frame it happens on. Every
+// palette colour is fully opaque, so a flag per cell answers the same question.
+function maskForPose(name) {
+  const mask = new Uint8Array(SPRITE_WIDTH * SPRITE_HEIGHT);
+
+  forEachLayer(name, CAT_TOP, (part, x, y) => {
+    const rows = PARTS[part];
+
+    for (let row = 0; row < rows.length; row += 1) {
+      const line = rows[row];
+      const pixelY = y + row;
+      if (pixelY < 0 || pixelY >= SPRITE_HEIGHT) continue;
+
+      for (let column = 0; column < line.length; column += 1) {
+        const pixelX = x + column;
+        if (line[column] === "." || pixelX < 0 || pixelX >= SPRITE_WIDTH) continue;
+        mask[pixelY * SPRITE_WIDTH + pixelX] = 1;
+      }
+    }
+  });
+
+  return mask;
 }
 
 // Poses are composited once and reused, so a frame costs a single blit.
 function bakePose(name) {
   const canvas = createCanvas(SPRITE_WIDTH, SPRITE_HEIGHT);
   paintPose(canvas.getContext("2d"), name, CAT_TOP);
-  return canvas;
+  return { canvas, mask: maskForPose(name) };
 }
 
 export function createSprite({ catCanvas, emoteCanvas }) {
@@ -507,6 +765,18 @@ export function createSprite({ catCanvas, emoteCanvas }) {
   const catContext = catCanvas.getContext("2d");
   const emoteContext = emoteCanvas.getContext("2d");
   let lastPose = null;
+  // What the emote layer currently shows, as a comparable key. Null means the
+  // layer is already blank.
+  let lastEmoteKey = null;
+
+  function bakedPose(name) {
+    let entry = baked.get(name);
+    if (!entry) {
+      entry = bakePose(name);
+      baked.set(name, entry);
+    }
+    return entry;
+  }
 
   function poseFor(state, now) {
     const animation = ANIMATIONS[state] ?? ANIMATIONS.idle;
@@ -516,11 +786,23 @@ export function createSprite({ catCanvas, emoteCanvas }) {
   }
 
   function drawEmotes(state, direction, now) {
-    emoteContext.clearRect(0, 0, SPRITE_WIDTH, SPRITE_HEIGHT);
     const emote = EMOTES[state];
-    if (!emote) return;
+
+    // Most states have no emote at all. Clearing the layer anyway marked it
+    // dirty on every frame, so the compositor repainted a blank canvas over the
+    // desktop for the whole time Kairo was doing anything but sleeping, being
+    // happy or chasing something.
+    if (!emote) {
+      if (lastEmoteKey !== null) {
+        emoteContext.clearRect(0, 0, SPRITE_WIDTH, SPRITE_HEIGHT);
+        lastEmoteKey = null;
+      }
+      return;
+    }
 
     const { width } = partSize(emote.part);
+    const draws = [];
+    let key = state;
 
     for (let index = 0; index < emote.count; index += 1) {
       const phase =
@@ -538,8 +820,23 @@ export function createSprite({ catCanvas, emoteCanvas }) {
       // columns reflected by hand to stay beside the head.
       if (direction === -1) x = SPRITE_WIDTH - x - width;
 
-      emoteContext.globalAlpha = eased < 0.18 ? eased / 0.18 : 1 - eased * 0.75;
-      paintPart(emoteContext, emote.part, x, y);
+      // Rounded to the 8 bits the canvas stores anyway, so two frames that would
+      // land on the same pixels compare equal instead of repainting.
+      const alpha =
+        Math.round((eased < 0.18 ? eased / 0.18 : 1 - eased * 0.75) * 255) / 255;
+
+      draws.push({ x, y, alpha });
+      key += `|${x},${y},${alpha}`;
+    }
+
+    if (key === lastEmoteKey) return;
+    lastEmoteKey = key;
+
+    emoteContext.clearRect(0, 0, SPRITE_WIDTH, SPRITE_HEIGHT);
+
+    for (const draw of draws) {
+      emoteContext.globalAlpha = draw.alpha;
+      paintPart(emoteContext, emote.part, draw.x, draw.y);
     }
 
     emoteContext.globalAlpha = 1;
@@ -550,9 +847,8 @@ export function createSprite({ catCanvas, emoteCanvas }) {
       const pose = poseFor(state, now);
 
       if (pose !== lastPose) {
-        if (!baked.has(pose)) baked.set(pose, bakePose(pose));
         catContext.clearRect(0, 0, SPRITE_WIDTH, SPRITE_HEIGHT);
-        catContext.drawImage(baked.get(pose), 0, 0);
+        catContext.drawImage(bakedPose(pose).canvas, 0, 0);
         lastPose = pose;
       }
 
@@ -562,7 +858,8 @@ export function createSprite({ catCanvas, emoteCanvas }) {
     // Used for hit testing so clicks on the transparent headroom fall through.
     isOpaqueAt(x, y) {
       if (x < 0 || y < 0 || x >= SPRITE_WIDTH || y >= SPRITE_HEIGHT) return false;
-      return catContext.getImageData(x, y, 1, 1).data[3] > 8;
+      if (!lastPose) return false;
+      return bakedPose(lastPose).mask[y * SPRITE_WIDTH + x] === 1;
     }
   };
 }

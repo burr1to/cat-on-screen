@@ -19,8 +19,11 @@ it off.
 
 ## Features
 
-- Autonomous walking, running, sitting, grooming, stretching, rolling, napping,
-  jumping, and idle animations.
+- Autonomous walking, running, sitting, loafing, grooming, licking, kneading,
+  scratching behind an ear, yawning, drinking, perking up, slow blinking,
+  crouching and wiggling before a pounce, chasing a bug, stretching, rolling,
+  napping, jumping, and idle animations.
+- A shake-off after landing from a throw or a real drop.
 - Speech bubbles with editable phrases and configurable timing.
 - Size, position, always-on-top, startup, and update settings.
 - Windows login startup and Linux desktop autostart.
