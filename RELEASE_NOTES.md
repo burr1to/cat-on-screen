@@ -1,5 +1,21 @@
 # Release notes
 
+## 0.2.1 — 2 August 2026
+
+### Fixed
+
+- Made movement smooth and substantially lighter on Windows by keeping Kairo's
+  transparent work-area window stationary and animating the cat inside it at
+  the display refresh rate. Empty pixels remain click-through, while Kairo can
+  still be petted, dragged, and thrown.
+- Kept Linux on its existing small-window path, where native window movement is
+  already efficient and avoids Wayland click-through limitations.
+
+### Notes
+
+- This is a Windows-only release. Linux users can remain on 0.2.0; its runtime
+  path is unchanged.
+
 ## 0.2.0 — 1 August 2026
 
 ### Added

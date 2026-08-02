@@ -11,6 +11,13 @@ const capturePath = captureArgument?.slice("--capture=".length);
 const isCaptureMode = Boolean(capturePath);
 const isSmokeTest = process.argv.includes("--smoke-test");
 const isAutomatedTest = isCaptureMode || isSmokeTest;
+// Windows pays a high DWM cost when a transparent native window is moved every
+// frame. Keep the window still there and move Kairo inside it instead. The flag
+// exists only so Linux CI can exercise the Windows layout without pretending to
+// be Windows.
+const usesStationaryOverlay =
+  !isCaptureMode &&
+  (process.platform === "win32" || process.argv.includes("--stationary-overlay"));
 
 if (isAutomatedTest) {
   app.disableHardwareAcceleration();
@@ -193,16 +200,20 @@ function setWindowPositionImmediately(x, y) {
 }
 
 function createCatWindow() {
-  // A full-screen transparent overlay is the obvious way to build a desktop pet
-  // and the wrong one: it covers the panel, every title bar and every close
-  // button, and the only thing that would save it -- an X11 input shape -- is not
-  // honoured by every compositor (Wayland ignores it outright). So the window is
-  // only as large as Kairo plus his speech bubble, and it is moved as he walks.
-  // A window that is not over the panel cannot swallow clicks on the panel,
-  // whatever the compositor does.
+  // Linux uses a small moving window because Wayland cannot make a transparent
+  // stage click-through. Windows supports forwarded mouse movement on an ignored
+  // window, so it uses a stationary work-area stage and avoids costly DWM native
+  // window moves.
   const stage = stageFor();
   const bounds = isCaptureMode
     ? { x: 0, y: 0, width: 960, height: 600 }
+    : usesStationaryOverlay
+      ? {
+          x: stage.origin.x,
+          y: stage.origin.y,
+          width: stage.world.width,
+          height: primaryWorkArea().height
+        }
     : {
         x: stage.origin.x + Math.floor(stage.world.width * CAT_START_FRACTION),
         y: stage.origin.y + stage.world.height - stage.window.height,
@@ -249,6 +260,13 @@ function createCatWindow() {
   appliedWindowPosition = { x: bounds.x, y: bounds.y };
 
   catWindow.setMenu(null);
+
+  if (usesStationaryOverlay) {
+    // Empty overlay pixels must behave as if the window did not exist. Windows
+    // can still forward mouse movement while ignoring clicks, letting the
+    // renderer turn input back on only when the pointer reaches Kairo.
+    catWindow.setIgnoreMouseEvents(true, { forward: true });
+  }
 
   if (!isCaptureMode && process.platform !== "win32") {
     catWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
@@ -301,9 +319,21 @@ function createCatWindow() {
     catWindow.webContents.once("did-finish-load", async () => {
       try {
         await new Promise((resolve) => setTimeout(resolve, 1200));
+        const boundsBeforeMotion = catWindow.getBounds();
+        if (usesStationaryOverlay) {
+          sendCommand("jump");
+          await new Promise((resolve) => setTimeout(resolve, 250));
+        }
         const snapshot = await catWindow.webContents.executeJavaScript(
           "window.__KAIRO_TEST__.snapshot()"
         );
+        if (usesStationaryOverlay) {
+          const boundsAfterMotion = catWindow.getBounds();
+          if (!snapshot.stationaryOverlay) throw new Error("stationary stage was not enabled");
+          if (JSON.stringify(boundsAfterMotion) !== JSON.stringify(boundsBeforeMotion)) {
+            throw new Error("stationary overlay moved with Kairo");
+          }
+        }
         console.log(`Overlay smoke test passed: ${JSON.stringify(snapshot)}`);
       } catch (error) {
         console.error(`Overlay smoke test failed: ${error.message}`);
@@ -377,18 +407,41 @@ function publishStage() {
   const stage = stageFor();
   stageOrigin = stage.origin;
 
-  if (catWindowSize.width !== stage.window.width || catWindowSize.height !== stage.window.height) {
-    catWindow.setSize(stage.window.width, stage.window.height, false);
-    catWindowSize = { width: stage.window.width, height: stage.window.height };
+  const windowBounds = usesStationaryOverlay
+    ? {
+        x: stage.origin.x,
+        y: stage.origin.y,
+        width: stage.world.width,
+        height: primaryWorkArea().height
+      }
+    : stage.window;
+
+  if (usesStationaryOverlay) {
+    const current = catWindow.getBounds();
+    if (
+      current.x !== windowBounds.x ||
+      current.y !== windowBounds.y ||
+      current.width !== windowBounds.width ||
+      current.height !== windowBounds.height
+    ) {
+      catWindow.setBounds(windowBounds, false);
+    }
+  } else if (
+    catWindowSize.width !== windowBounds.width ||
+    catWindowSize.height !== windowBounds.height
+  ) {
+    catWindow.setSize(windowBounds.width, windowBounds.height, false);
   }
+  catWindowSize = { width: windowBounds.width, height: windowBounds.height };
 
   // `full` must be sent explicitly, not left out: the renderer merges stage
   // updates, so an omitted flag would leave a previous `full: true` in place and
   // the window would stay stage-sized and stop following him.
   catWindow.webContents.send("cat:stage", {
     world: stage.world,
-    window: stage.window,
-    origin: stage.origin
+    window: { width: windowBounds.width, height: windowBounds.height },
+    origin: stage.origin,
+    full: usesStationaryOverlay
   });
 }
 
@@ -396,6 +449,8 @@ function publishStage() {
 // works even if the renderer is not currently painting.
 function recentreWindow() {
   if (!catWindow || isCaptureMode) return;
+
+  if (usesStationaryOverlay) return;
 
   const stage = stageFor();
   setWindowPositionImmediately(
@@ -547,7 +602,7 @@ function createTray() {
 // may produce frames faster than the desktop window manager needs to move, so
 // requestWindowPosition coalesces them before touching the native window.
 ipcMain.on("cat:frame", (event, frame) => {
-  if (event.sender !== catWindow?.webContents || isCaptureMode) return;
+  if (event.sender !== catWindow?.webContents || isCaptureMode || usesStationaryOverlay) return;
   if (!frame || !Number.isFinite(frame.x) || !Number.isFinite(frame.y)) return;
 
   const area = primaryWorkArea();
@@ -568,6 +623,12 @@ ipcMain.on("cat:frame", (event, frame) => {
   );
 
   requestWindowPosition(x, y);
+});
+
+ipcMain.on("cat:mouse-passthrough", (event, ignore) => {
+  if (event.sender !== catWindow?.webContents || !usesStationaryOverlay) return;
+  if (typeof ignore !== "boolean") return;
+  catWindow.setIgnoreMouseEvents(ignore, ignore ? { forward: true } : undefined);
 });
 
 ipcMain.on("cat:settings-request", (event) => {

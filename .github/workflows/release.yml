@@ -1,6 +1,6 @@
 name: Release
 
-# Pushing a version tag builds Kairo for both platforms and publishes a GitHub
+# Pushing a version tag builds the selected platforms and publishes a GitHub
 # release with the binaries attached. Nothing is released without a tag, so
 # ordinary pushes to main stay harmless.
 on:
@@ -19,20 +19,34 @@ permissions:
   contents: write
 
 jobs:
+  targets:
+    name: Select release targets
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.targets.outputs.matrix }}
+
+    steps:
+      - name: Select platforms for this tag
+        id: targets
+        env:
+          TAG: ${{ github.event.inputs.tag || github.ref_name }}
+        run: |
+          if [ "$TAG" = "v0.2.1" ]; then
+            echo 'matrix={"include":[{"os":"windows-latest","label":"Windows x64","script":"dist:windows"}]}' >> "$GITHUB_OUTPUT"
+          else
+            echo 'matrix={"include":[{"os":"windows-latest","label":"Windows x64","script":"dist:windows"},{"os":"ubuntu-latest","label":"Linux x86_64","script":"dist:linux"}]}' >> "$GITHUB_OUTPUT"
+          fi
+
   build:
     name: Build ${{ matrix.label }}
+    needs: targets
     runs-on: ${{ matrix.os }}
     strategy:
       # One platform failing should not hide whether the other one built.
       fail-fast: false
-      matrix:
-        include:
-          - os: windows-latest
-            label: Windows x64
-            script: "dist:windows"
-          - os: ubuntu-latest
-            label: Linux x86_64
-            script: "dist:linux"
+      # v0.2.1 is deliberately Windows-only. Later ordinary version tags keep
+      # the normal two-platform matrix selected by the targets job above.
+      matrix: ${{ fromJSON(needs.targets.outputs.matrix) }}
 
     steps:
       - uses: actions/checkout@v4
@@ -49,6 +63,14 @@ jobs:
       # A tag should not be able to ship a build whose behaviour tests fail.
       - name: Behaviour tests
         run: npm test
+
+      - name: Fetch Electron for the native Windows smoke test
+        if: matrix.os == 'windows-latest'
+        run: node node_modules/electron/install.js
+
+      - name: Native Windows overlay smoke test
+        if: matrix.os == 'windows-latest'
+        run: npm run test:windows-overlay-native
 
       # --publish never matters: electron-builder infers a GitHub publish target
       # from the git remote and would try to create its own release, colliding

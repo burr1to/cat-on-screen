@@ -49,5 +49,31 @@ jobs:
       - name: Overlay smoke test
         run: npm run test:overlay
 
+      # Windows uses a stationary work-area overlay rather than moving a native
+      # transparent window. Xvfb cannot reproduce DWM, but it can pin the layout
+      # contract and prove Kairo moves without moving the BrowserWindow.
+      - name: Stationary Windows overlay smoke test
+        run: npm run test:windows-overlay
+
       - name: Drag tracks the cursor without running away
         run: npm run test:drag
+
+  windows-overlay:
+    name: Native Windows overlay
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Fetch Electron
+        run: node node_modules/electron/install.js
+
+      - name: Stationary overlay smoke test
+        run: npm run test:windows-overlay-native

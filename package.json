@@ -1,6 +1,6 @@
 {
   "name": "kairo-desktop-cat",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "A tiny grey cartoon cat that lives on your desktop.",
   "desktopName": "kairo-desktop-cat.desktop",
   "main": "src/main.cjs",
@@ -10,6 +10,8 @@
     "assets:icon": "xvfb-run -a electron scripts/export-icon.cjs",
     "test": "node --test",
     "test:overlay": "xvfb-run -a electron . --smoke-test",
+    "test:windows-overlay": "xvfb-run -a electron . --smoke-test --stationary-overlay",
+    "test:windows-overlay-native": "electron . --smoke-test",
     "test:visual": "xvfb-run -a electron . --capture=artifacts/linux-sandbox.png",
     "pack:linux": "electron-builder --linux dir",
     "dist:linux": "electron-builder --linux AppImage",

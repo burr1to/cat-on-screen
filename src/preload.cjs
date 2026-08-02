@@ -6,6 +6,9 @@ contextBridge.exposeInMainWorld("desktopPet", {
   placeWindow(frame) {
     ipcRenderer.send("cat:frame", frame);
   },
+  setMousePassthrough(ignore) {
+    ipcRenderer.send("cat:mouse-passthrough", ignore);
+  },
   onStage(callback) {
     const listener = (_event, stage) => callback(stage);
     ipcRenderer.on("cat:stage", listener);
